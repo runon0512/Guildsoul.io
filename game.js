@@ -47,16 +47,16 @@ const PROMOTION_DIFFICULTIES = {
     'B': 200, // BtoA
     'A': 250, // AtoS
     'S': 300,
-    'X': 310,
-    'XG': 320,
-    'XF': 330,
-    'XE': 340,
-    'XD': 350,
-    'XC': 360,
-    'XB': 370,
-    'XA': 380,
-    'XS': 390,
-    'XX': 399,
+    'X': 330,
+    'XG': 360,
+    'XF': 390,
+    'XE': 420,
+    'XD': 450,
+    'XC': 480,
+    'XB': 510,
+    'XA': 540,
+    'XS': 570,
+    'XX': 600,
     'V': Infinity
 };
 // 昇級試験の成功率の基本値 (不足している場合に適用される最低ライン)
@@ -134,6 +134,13 @@ let quests = [
     { id: 71, name: "エンシェントドラゴンの討伐", reward: 1000, difficulty: 300, available: true, requiredRank: 'S', aptitudes: { combat: 100, magic: 750, exploration: 50 } },
     { id: 72, name: "魔王軍幹部の暗殺", reward: 900, difficulty: 280, available: true, requiredRank: 'S', aptitudes: { combat: 90, magic: '無関係', exploration: 80 } },
     { id: 73, name: "失われた王国の秘宝探索", reward: 800, difficulty: 260, available: true, requiredRank: 'S', aptitudes: { combat: 50, magic: 80, exploration: 90 } },
+
+    // Xランク以上
+    { id: 81, name: "深淵の邪神の復活阻止", reward: 2500, difficulty: 400, available: true, requiredRank: 'X', aptitudes: { combat: 120, magic: 150, exploration: 100 } },
+    { id: 82, name: "次元の裂け目の調査", reward: 2200, difficulty: 350, available: true, requiredRank: 'X', aptitudes: { combat: '無関係', magic: 180, exploration: 120 } },
+
+    // XXランク以上
+    { id: 91, name: "創世の神々への挑戦", reward: 5000, difficulty: 600, available: true, requiredRank: 'XX', aptitudes: { combat: 200, magic: 200, exploration: 200 } },
 ];
 
 
@@ -181,7 +188,9 @@ function getRankColor(rank) {
  * @returns {string} HTML文字列
  */
 function getStyledSkillHtml(skillValue) {
-    if (skillValue > 100) {
+    if (skillValue > 150) {
+        return `<span style="color: #00BFFF; font-weight: bold; text-shadow: 0 0 5px #00BFFF;">${skillValue}</span>`;
+    } else if (skillValue > 100) {
         return `<span style="color: red; font-weight: bold;">${skillValue}</span>`;
     } else if (skillValue > 80) {
         return `<span style="color: orange;">${skillValue}</span>`;
@@ -230,7 +239,7 @@ function updateAllTimeRecord(adv) {
  */
 function getRandomSkill(base) {
     let skill = base + Math.floor(Math.random() * 41) - 20;
-    return Math.max(0, Math.min(133, skill));
+    return Math.max(0, Math.min(200, skill));
 }
 
 /**
@@ -421,6 +430,17 @@ function getRankMultiplier(rank) {
         case 'B': return 2.2;
         case 'A': return 2.5;
         case 'S': return 3.0; // Sランクは成長が急速
+        case 'X': return 3.1;
+        case 'XG': return 3.2;
+        case 'XF': return 3.3;
+        case 'XE': return 3.4;
+        case 'XD': return 3.5;
+        case 'XC': return 3.6;
+        case 'XB': return 3.7;
+        case 'XA': return 3.8;
+        case 'XS': return 3.9;
+        case 'XX': return 4.0;
+        case 'V': return 4.5; // 最終ランクは最高の成長率
         default: return 1.0;
     }
 }
@@ -461,7 +481,7 @@ function levelUp(adv) {
         const skillIncrease = Math.floor(Math.random() * 3) + 3; 
         
         // 最大値133を超えないように、実際の上昇値を計算
-        const actualIncrease = Math.min(skillIncrease, 133 - adv.skills[skill]);
+        const actualIncrease = Math.min(skillIncrease, 200 - adv.skills[skill]);
         
         adv.skills[skill] += actualIncrease;
         adv.ovr += actualIncrease; // OVRも上昇分だけ増やす
@@ -691,7 +711,9 @@ function retireAdventurer(advId) {
     // 退職金の計算
     // その年の残り月数（今月分も含む） x 月給
     const remainingMonths = 12 - currentMonth + 1;
-    const monthlySalary = Math.ceil(adv.annualSalary / 12);
+    // ★ 引退時点の最新のOVR/ランクで年俸を再計算して月給を算出
+    const currentAnnualSalary = calculateAnnualSalary(adv.ovr, adv.rank);
+    const monthlySalary = Math.ceil(currentAnnualSalary / 12);
     const severancePay = monthlySalary * remainingMonths;
 
     const confirmationMessage = `冒険者「${adv.name}」を引退させますか？\n\n` +
@@ -722,6 +744,11 @@ function scoutAdventurers(policyKey) {
 
     if (!policy) {
         alert("無効なスカウト方針が選択されました。");
+        return;
+    }
+
+    if (adventurers.length >= 10) {
+        alert('ギルドの人数が上限の10人に達しているため、新しい冒険者をスカウトできません。');
         return;
     }
 
@@ -883,6 +910,11 @@ function joinSelectedAdventurers(policyKey) {
         return;
     }
     
+    if (adventurers.length + selectedIds.length > 10) {
+        alert(`ギルドの最大人数は10人です。現在の所属人数: ${adventurers.length}人。\n${selectedIds.length}人加入させると上限を超えてしまいます。`);
+        return;
+    }
+
     if (gold < totalCost) {
         alert(`資金が足りません。合計加入費用 ${totalCost} 万Gが必要です。（現在資金: ${gold} 万G）`);
         return;
@@ -1028,8 +1060,15 @@ function renderQuests() {
         }
     });
 
-    // 合格確率の高い順にソート
-    promotionExams.sort((a, b) => b.estimatedRate - a.estimatedRate);
+    // 合格確率の高い順にソート。確率が同じ場合は難易度が高い順にソート。
+    promotionExams.sort((a, b) => {
+        // 最初に合格率で比較（降順）
+        if (b.estimatedRate !== a.estimatedRate) {
+            return b.estimatedRate - a.estimatedRate;
+        }
+        // 合格率が同じなら、難易度で比較（降順）
+        return b.difficulty - a.difficulty;
+    });
 
     // --- ソートされた昇級試験の表示 ---
     promotionExams.forEach(pQuest => {
@@ -1120,7 +1159,7 @@ function showQuestSelection(questId, targetAdvId = null) {
 
     if (isPromotion) {
         const adv = adventurers.find(a => a.id === targetAdvId);
-        if (!adv || adv.rank === 'S') return;
+        if (!adv || adv.rank === 'V') return; // ★ Sランクでも試験を受けられるように修正 (Vランクは最終)
         
         const currentRankIndex = RANKS.indexOf(adv.rank);
         nextRank = RANKS[currentRankIndex + 1];
@@ -1190,7 +1229,7 @@ function showQuestSelection(questId, targetAdvId = null) {
                 <th>獲得予定EXP (成功時)</th> </tr>
         </table>
         <div style="text-align: center; margin-top: 20px;">
-            <button id="send-quest-button" onclick="sendAdventurersToQuest(${quest.id}, ${quest.isPromotion}, ${quest.isPromotion ? targetAdvId : null})" disabled>派遣予定に入れる</button>
+            <button id="send-quest-button" ${quest.isPromotion ? 'class="promotion-dispatch-button"' : ''} onclick="sendAdventurersToQuest(${quest.id}, ${quest.isPromotion}, ${quest.isPromotion ? targetAdvId : null})" disabled>派遣予定に入れる</button>
             <button onclick="cancelQuestSelection()">キャンセル</button>
         </div>
     `;
@@ -1427,12 +1466,14 @@ function sendAdventurersToQuest(questId, isPromotion, targetAdvId = null) {
     const selectedIds = Array.from(checkedCheckboxes).map(cb => parseInt(cb.value));
     const sentAdventurers = adventurers.filter(adv => selectedIds.includes(adv.id));
 
+    let quest; // ★関数のスコープで変数を宣言
+
     if (isPromotion) {
         const adv = sentAdventurers[0];
         if (!adv) return;
         const currentRankIndex = RANKS.indexOf(adv.rank);
         const nextRank = RANKS[currentRankIndex + 1];
-        const quest = {
+        quest = { // ★constを削除し、変数に代入する
             id: questId,
             name: `${adv.name} の昇級試験 (${adv.rank} → ${nextRank})`,
             difficulty: PROMOTION_DIFFICULTIES[adv.rank],
@@ -1440,14 +1481,14 @@ function sendAdventurersToQuest(questId, isPromotion, targetAdvId = null) {
         };
         sendAdventurersToQuestInternal(quest, sentAdventurers);
     } else {
-        const quest = quests.find(q => q.id === questId);
+        quest = quests.find(q => q.id === questId); // ★constを削除し、変数に代入する
         if (!quest) return;
         sendAdventurersToQuestInternal(quest, sentAdventurers);
     }
 
     // 3. UIを更新
     cancelQuestSelection();
-    
+
     alert(`【${quest.name}】に${sentAdventurers.length}名の冒険者を派遣予定に入れました！\n結果は「Next Month」で確認できます。`);
     updateDisplay();
 }
