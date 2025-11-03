@@ -62,9 +62,6 @@ const PROMOTION_DIFFICULTIES = {
 // 昇級試験の成功率の基本値 (不足している場合に適用される最低ライン)
 const PROMOTION_BASE_SUCCESS_RATE = 50; 
 
-// ★ スカウト能力強化の費用
-const SCOUT_UPGRADE_COSTS = [100, 200, 300, 500, 1000];
-
 
 // スカウト方針の定義 (費用を万G単位に調整)
 const SCOUT_POLICIES = {
@@ -498,51 +495,6 @@ function updateDisplay() {
     scoutSkillEl.textContent = scoutSkill;
     renderAdventurerList();
     renderQuests();
-    updateScoutUpgradeButton();
-}
-/**
- * スカウト能力を強化します。
- */
-function upgradeScoutSkill() {
-    const currentUpgradeLevel = Math.floor((scoutSkill - 100) / 10);
-
-    if (currentUpgradeLevel >= SCOUT_UPGRADE_COSTS.length) {
-        alert('スカウト能力はこれ以上強化できません。');
-        return;
-    }
-
-    const cost = SCOUT_UPGRADE_COSTS[currentUpgradeLevel];
-
-    if (gold < cost) {
-        alert(`資金が足りません。強化には ${cost} 万G 必要です。`);
-        return;
-    }
-
-    if (confirm(`スカウト能力を強化しますか？\n費用: ${cost} 万G\n効果: スカウト能力 +10`)) {
-        gold -= cost;
-        scoutSkill += 10;
-        alert(`スカウト能力が10上昇し、${scoutSkill}になりました！`);
-        updateDisplay();
-    }
-}
-
-/**
- * スカウト能力強化ボタンの表示を更新します。
- */
-function updateScoutUpgradeButton() {
-    const button = document.getElementById('upgrade-scout-button');
-    if (!button) return;
-
-    const currentUpgradeLevel = Math.floor((scoutSkill - 100) / 10);
-
-    if (currentUpgradeLevel >= SCOUT_UPGRADE_COSTS.length) {
-        button.textContent = 'スカウト能力 (強化MAX)';
-        button.disabled = true;
-    } else {
-        const cost = SCOUT_UPGRADE_COSTS[currentUpgradeLevel];
-        button.textContent = `スカウト能力強化 (+10 / ${cost}万G)`;
-        button.disabled = false;
-    }
 }
 
 
