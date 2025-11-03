@@ -1,5 +1,5 @@
 // --- ゲームの状態 ---
-let gold = 100; // 資金を100万Gに変更
+let gold = 500; // 資金を500万Gに変更
 let adventurers = []; // ギルドに所属する冒険者
 let scoutCandidates = []; // スカウト候補リスト
 let scoutSkill = 100; // ギルドのスカウト能力 (初期値100)
@@ -13,7 +13,7 @@ let isInTutorial = false;
 
 
 // --- ランク定義 ---
-const RANKS = ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S'];
+const RANKS = ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S', 'X', 'XG', 'XF', 'XE', 'XD', 'XC', 'XB', 'XA', 'XS', 'XX', 'V'];
 // ★ 年俸計算用のランクボーナス (万G)
 const SALARY_RANK_BONUS = {
     'G': 100,
@@ -23,7 +23,18 @@ const SALARY_RANK_BONUS = {
     'C': 2000,
     'B': 5000,
     'A': 7500,
-    'S': 10000
+    'S': 10000,
+    'X': 10000,
+    'XG': 10000,
+    'XF': 10000,
+    'XE': 10000,
+    'XD': 10000,
+    'XC': 10000,
+    'XB': 10000,
+    'XA': 10000,
+    'XS': 10000,
+    'XX': 10000,
+    'V': 10000
 };
 // 昇級試験の適正能力の合計 (difficulty)
 // これが最低ライン。超過分が成功率にボーナスとして加算されます。
@@ -35,7 +46,18 @@ const PROMOTION_DIFFICULTIES = {
     'C': 150, // CtoB
     'B': 200, // BtoA
     'A': 250, // AtoS
-    'S': Infinity 
+    'S': 300,
+    'X': 310,
+    'XG': 320,
+    'XF': 330,
+    'XE': 340,
+    'XD': 350,
+    'XC': 360,
+    'XB': 370,
+    'XA': 380,
+    'XS': 390,
+    'XX': 399,
+    'V': Infinity
 };
 // 昇級試験の成功率の基本値 (不足している場合に適用される最低ライン)
 const PROMOTION_BASE_SUCCESS_RATE = 50; 
@@ -77,44 +99,44 @@ const SCOUT_POLICIES = {
 
 let quests = [
     // Gランク (誰でも)
-    { id: 1, name: "ゴブリン討伐", reward: 20, difficulty: 50, available: true, aptitudes: { combat: 25, magic: '無関係', exploration: 15 } },
-    { id: 2, name: "薬草の採取", reward: 10, difficulty: 30, available: true, aptitudes: { combat: '無関係', magic: '無関係', exploration: 20 } },
-    { id: 3, name: "街道の整備", reward: 15, difficulty: 40, available: true, aptitudes: { combat: 15, magic: '無関係', exploration: 15 } },
+    { id: 1, name: "ゴブリン討伐", reward: 15, difficulty: 50, available: true, aptitudes: { combat: 25, magic: '無関係', exploration: 15 } },
+    { id: 2, name: "薬草の採取", reward: 15, difficulty: 30, available: true, aptitudes: { combat: '無関係', magic: '無関係', exploration: 20 } },
+    { id: 3, name: "街道の整備", reward: 10, difficulty: 40, available: true, aptitudes: { combat: 15, magic: '無関係', exploration: 15 } },
 
     // Fランク以上
-    { id: 11, name: "街道のゴブリン退治", reward: 30, difficulty: 60, available: true, requiredRank: 'F', aptitudes: { combat: 30, magic: '無関係', exploration: 10 } },
-    { id: 12, name: "迷いの森の薬草集め", reward: 25, difficulty: 55, available: true, requiredRank: 'F', aptitudes: { combat: '無関係', magic: 15, exploration: 25 } },
-    { id: 13, name: "農村の害獣駆除", reward: 35, difficulty: 65, available: true, requiredRank: 'F', aptitudes: { combat: 25, magic: '無関係', exploration: 20 } },
+    { id: 11, name: "街道のゴブリン退治", reward: 20, difficulty: 60, available: true, requiredRank: 'F', aptitudes: { combat: 30, magic: '無関係', exploration: 10 } },
+    { id: 12, name: "迷いの森の薬草集め", reward: 17, difficulty: 55, available: true, requiredRank: 'F', aptitudes: { combat: '無関係', magic: 15, exploration: 25 } },
+    { id: 13, name: "農村の害獣駆除", reward: 18, difficulty: 65, available: true, requiredRank: 'F', aptitudes: { combat: 25, magic: '無関係', exploration: 20 } },
 
     // Eランク以上
-    { id: 21, name: "廃坑のオーク掃討", reward: 50, difficulty: 80, available: true, requiredRank: 'E', aptitudes: { combat: 35, magic: '無関係', exploration: 20 } },
-    { id: 22, name: "水晶洞窟の調査", reward: 45, difficulty: 75, available: true, requiredRank: 'E', aptitudes: { combat: 15, magic: 25, exploration: 30 } },
-    { id: 23, name: "商隊の護衛", reward: 60, difficulty: 90, available: true, requiredRank: 'E', aptitudes: { combat: 40, magic: '無関係', exploration: 25 } },
+    { id: 21, name: "廃坑のオーク掃討", reward: 35, difficulty: 80, available: true, requiredRank: 'E', aptitudes: { combat: 35, magic: '無関係', exploration: 20 } },
+    { id: 22, name: "水晶洞窟の調査", reward: 30, difficulty: 75, available: true, requiredRank: 'E', aptitudes: { combat: 15, magic: 25, exploration: 30 } },
+    { id: 23, name: "商隊の護衛", reward: 33, difficulty: 90, available: true, requiredRank: 'E', aptitudes: { combat: 40, magic: '無関係', exploration: 25 } },
 
     // Dランク以上
-    { id: 31, name: "リザードマンの集落討伐", reward: 80, difficulty: 110, available: true, requiredRank: 'D', aptitudes: { combat: 45, magic: 15, exploration: 25 } },
-    { id: 32, name: "古代遺跡の地図作成", reward: 70, difficulty: 100, available: true, requiredRank: 'D', aptitudes: { combat: '無関係', magic: 20, exploration: 45 } },
-    { id: 33, name: "呪われた沼の浄化", reward: 90, difficulty: 120, available: true, requiredRank: 'D', aptitudes: { combat: 20, magic: 45, exploration: 30 } },
+    { id: 31, name: "リザードマンの集落討伐", reward: 70, difficulty: 110, available: true, requiredRank: 'D', aptitudes: { combat: 45, magic: 15, exploration: 25 } },
+    { id: 32, name: "古代遺跡の地図作成", reward: 66, difficulty: 100, available: true, requiredRank: 'D', aptitudes: { combat: '無関係', magic: 20, exploration: 45 } },
+    { id: 33, name: "呪われた沼の浄化", reward: 60, difficulty: 120, available: true, requiredRank: 'D', aptitudes: { combat: 20, magic: 45, exploration: 30 } },
 
     // Cランク以上
-    { id: 41, name: "ワイバーンの巣の偵察", reward: 120, difficulty: 140, available: true, requiredRank: 'C', aptitudes: { combat: 30, magic: '無関係', exploration: 55 } },
-    { id: 42, name: "魔導書の捜索", reward: 110, difficulty: 130, available: true, requiredRank: 'C', aptitudes: { combat: '無関係', magic: 50, exploration: 40 } },
-    { id: 43, name: "盗賊団の砦の攻略", reward: 150, difficulty: 150, available: true, requiredRank: 'C', aptitudes: { combat: 60, magic: '無関係', exploration: 35 } },
+    { id: 41, name: "ワイバーンの巣の偵察", reward: 133, difficulty: 140, available: true, requiredRank: 'C', aptitudes: { combat: 30, magic: '無関係', exploration: 55 } },
+    { id: 42, name: "魔導書の捜索", reward: 130, difficulty: 130, available: true, requiredRank: 'C', aptitudes: { combat: '無関係', magic: 50, exploration: 40 } },
+    { id: 43, name: "盗賊団の砦の攻略", reward: 135, difficulty: 150, available: true, requiredRank: 'C', aptitudes: { combat: 60, magic: '無関係', exploration: 35 } },
 
     // Bランク以上
-    { id: 51, name: "グリフォンの討伐", reward: 200, difficulty: 180, available: true, requiredRank: 'B', aptitudes: { combat: 65, magic: '無関係', exploration: 45 } },
-    { id: 52, name: "死霊術師の塔の破壊", reward: 220, difficulty: 200, available: true, requiredRank: 'B', aptitudes: { combat: 50, magic: 70, exploration: 30 } },
-    { id: 53, name: "王都への機密文書輸送", reward: 180, difficulty: 160, available: true, requiredRank: 'B', aptitudes: { combat: 35, magic: '無関係', exploration: 65 } },
+    { id: 51, name: "グリフォンの討伐", reward: 335, difficulty: 180, available: true, requiredRank: 'B', aptitudes: { combat: 65, magic: '無関係', exploration: 45 } },
+    { id: 52, name: "死霊術師の塔の破壊", reward: 340, difficulty: 200, available: true, requiredRank: 'B', aptitudes: { combat: 50, magic: 70, exploration: 30 } },
+    { id: 53, name: "王都への機密文書輸送", reward: 330, difficulty: 160, available: true, requiredRank: 'B', aptitudes: { combat: 35, magic: '無関係', exploration: 65 } },
 
     // Aランク以上
-    { id: 61, name: "ミノタウロスの迷宮攻略", reward: 300, difficulty: 220, available: true, requiredRank: 'A', aptitudes: { combat: 75, magic: 25, exploration: 60 } },
-    { id: 62, name: "古代ゴーレムの無力化", reward: 320, difficulty: 240, available: true, requiredRank: 'A', aptitudes: { combat: 50, magic: 80, exploration: 40 } },
-    { id: 63, name: "辺境伯からの密命", reward: 280, difficulty: 200, available: true, requiredRank: 'A', aptitudes: { combat: 40, magic: '無関係', exploration: 75 } },
+    { id: 61, name: "ミノタウロスの迷宮攻略", reward: 490, difficulty: 220, available: true, requiredRank: 'A', aptitudes: { combat: 75, magic: 25, exploration: 60 } },
+    { id: 62, name: "古代ゴーレムの無力化", reward: 500, difficulty: 240, available: true, requiredRank: 'A', aptitudes: { combat: 50, magic: 80, exploration: 40 } },
+    { id: 63, name: "辺境伯からの密命", reward: 480, difficulty: 200, available: true, requiredRank: 'A', aptitudes: { combat: 40, magic: '無関係', exploration: 75 } },
 
     // Sランク以上
     { id: 71, name: "エンシェントドラゴンの討伐", reward: 1000, difficulty: 300, available: true, requiredRank: 'S', aptitudes: { combat: 100, magic: 750, exploration: 50 } },
-    { id: 72, name: "魔王軍幹部の暗殺", reward: 800, difficulty: 280, available: true, requiredRank: 'S', aptitudes: { combat: 90, magic: '無関係', exploration: 80 } },
-    { id: 73, name: "失われた王国の秘宝探索", reward: 700, difficulty: 260, available: true, requiredRank: 'S', aptitudes: { combat: 50, magic: 80, exploration: 90 } },
+    { id: 72, name: "魔王軍幹部の暗殺", reward: 900, difficulty: 280, available: true, requiredRank: 'S', aptitudes: { combat: 90, magic: '無関係', exploration: 80 } },
+    { id: 73, name: "失われた王国の秘宝探索", reward: 800, difficulty: 260, available: true, requiredRank: 'S', aptitudes: { combat: 50, magic: 80, exploration: 90 } },
 ];
 
 
@@ -126,6 +148,10 @@ const adventurerListEl = document.getElementById('adventurer-list');
 const scoutAreaEl = document.getElementById('scout-area'); 
 const scoutSkillEl = document.getElementById('scout-skill'); 
 const questDetailAreaEl = document.getElementById('quest-detail-area'); 
+
+// ★ 先月の記録用DOM要素
+const lastMonthLogEl = document.getElementById('last-month-log');
+const logContentEl = document.getElementById('log-content');
 
 // --- チュートリアル用DOM要素 ---
 const tutorialOverlay = document.getElementById('tutorial-overlay');
@@ -149,6 +175,21 @@ function getRankColor(rank) {
         case 'F': return '#A0522D'; // Sienna
         case 'G': return '#696969'; // DimGray
         default: return 'inherit';
+    }
+}
+
+/**
+ * スキル値に応じたスタイル付きのHTMLを返します。
+ * @param {number} skillValue - スキル値
+ * @returns {string} HTML文字列
+ */
+function getStyledSkillHtml(skillValue) {
+    if (skillValue > 100) {
+        return `<span style="color: red; font-weight: bold;">${skillValue}</span>`;
+    } else if (skillValue > 80) {
+        return `<span style="color: orange;">${skillValue}</span>`;
+    } else {
+        return skillValue;
     }
 }
 
@@ -189,7 +230,7 @@ function updateAllTimeRecord(adv) {
  */
 function getRandomSkill(base) {
     let skill = base + Math.floor(Math.random() * 41) - 20;
-    return Math.max(0, Math.min(100, skill));
+    return Math.max(0, Math.min(133, skill));
 }
 
 /**
@@ -418,8 +459,8 @@ function levelUp(adv) {
         // 2から3のランダムな値 (Math.floor(Math.random() * (max - min + 1)) + min)
         const skillIncrease = Math.floor(Math.random() * 3) + 3; 
         
-        // 最大値100を超えないように、実際の上昇値を計算
-        const actualIncrease = Math.min(skillIncrease, 100 - adv.skills[skill]);
+        // 最大値133を超えないように、実際の上昇値を計算
+        const actualIncrease = Math.min(skillIncrease, 133 - adv.skills[skill]);
         
         adv.skills[skill] += actualIncrease;
         adv.ovr += actualIncrease; // OVRも上昇分だけ増やす
@@ -565,9 +606,9 @@ function renderAdventurerList() {
             <td>${adv.gender}/${adv.age}歳</td>
             <td><span class="adventurer-rank" style="color: ${rankColor}; font-weight: bold;">${adv.rank}</span></td>
             <td>${adv.ovr}</td>
-            <td>${adv.skills.combat}</td>
-            <td>${adv.skills.magic}</td>
-            <td>${adv.skills.exploration}</td>
+            <td>${getStyledSkillHtml(adv.skills.combat)}</td>
+            <td>${getStyledSkillHtml(adv.skills.magic)}</td>
+            <td>${getStyledSkillHtml(adv.skills.exploration)}</td>
             <td>${displayedAnnualSalary}</td>
             <td>
                 ${adv.exp} / ${adv.expToLevelUp}
@@ -799,9 +840,9 @@ function renderScoutCandidates(policyKey) {
             <td>${candidate.name}</td>
             <td>${candidate.gender}/${candidate.age}歳</td>
             <td><span style="font-weight: bold; color: ${isOverScoutSkill ? 'red' : 'inherit'};">${candidate.ovr}</span></td>
-            <td>${candidate.skills.combat}</td>
-            <td>${candidate.skills.magic}</td>
-            <td>${candidate.skills.exploration}</td>
+            <td>${getStyledSkillHtml(candidate.skills.combat)}</td>
+            <td>${getStyledSkillHtml(candidate.skills.magic)}</td>
+            <td>${getStyledSkillHtml(candidate.skills.exploration)}</td>
             <td>${candidate.joinCost} 万G</td>
             <td>${candidate.annualSalary} 万G</td>
         `;
@@ -1004,40 +1045,46 @@ function renderQuests() {
 
     let hasAvailableQuest = false;
 
-    // --- 昇級試験クエストの生成と表示 ---
-    // IDは1000から開始
+    // --- 昇級試験クエストの生成とソート ---
+    const promotionExams = [];
     adventurers.forEach(adv => {
-        // 待機中であり、Sランク未満の冒険者のみ昇級試験をリストに追加
-        if (adv.status === '待機中' && adv.rank !== 'S') {
+        if (adv.status === '待機中' && adv.rank !== 'V') {
             const currentRankIndex = RANKS.indexOf(adv.rank);
             const nextRank = RANKS[currentRankIndex + 1];
             const requiredDifficulty = PROMOTION_DIFFICULTIES[adv.rank];
             
-            // 昇級試験は報酬0、難易度設定、単独任務
             const promotionQuest = {
-                id: 1000 + adv.id, // IDをユニークにする
+                id: 1000 + adv.id,
                 name: `${adv.name} の昇級試験 (${adv.rank} → ${nextRank})`,
                 reward: 0,
                 difficulty: requiredDifficulty,
-                // 昇級試験はOVRベースなので、属性は無関係とする
                 aptitudes: { combat: '無関係', magic: '無関係', exploration: '無関係' }, 
                 isPromotion: true,
-                advId: adv.id // どの冒険者の試験か特定するためのID
+                adv: adv // 冒険者オブジェクトを保持
             };
+            // 合格率を計算して追加
+            promotionQuest.estimatedRate = calculateSuccessRate(promotionQuest, [adv]);
+            promotionExams.push(promotionQuest);
+        }
+    });
 
+    // 合格確率の高い順にソート
+    promotionExams.sort((a, b) => b.estimatedRate - a.estimatedRate);
+
+    // --- ソートされた昇級試験の表示 ---
+    promotionExams.forEach(pQuest => {
+        const adv = pQuest.adv;
+        if (adv) {
             const questDiv = document.createElement('div');
             questDiv.className = 'quest-item promotion-exam';
-            
-            // 昇級試験は単独任務が前提
-            const estimatedRate = calculateSuccessRate(promotionQuest, [adv]);
-            const statusColor = estimatedRate >= 0.7 ? 'green' : (estimatedRate >= 0.5 ? 'orange' : 'red');
+            const statusColor = pQuest.estimatedRate >= 0.7 ? 'green' : (pQuest.estimatedRate >= 0.5 ? 'orange' : 'red');
 
             questDiv.innerHTML = `
-                <h4>🎓 昇級試験: ${promotionQuest.name}</h4>
-                <p><strong>目標OVR:</strong> ${promotionQuest.difficulty} / **${adv.name} のOVR: ${adv.ovr}**</p>
-                <p><strong>成功率目安:</strong> <span style="font-weight:bold; color:${statusColor};">${Math.round(estimatedRate * 100)}%</span></p>
+                <h4>🎓 昇級試験: ${pQuest.name}</h4>
+                <p><strong>目標OVR:</strong> ${pQuest.difficulty} / **${adv.name} のOVR: ${adv.ovr}**</p>
+                <p><strong>成功率目安:</strong> <span style="font-weight:bold; color:${statusColor};">${Math.round(pQuest.estimatedRate * 100)}%</span></p>
                 <p style="font-size:0.9em;">※この任務は**${adv.name}単独**で挑みます。成功すると${nextRank}ランクに昇級します。</p>
-                <button onclick="showQuestSelection(${promotionQuest.id}, ${adv.id})">
+                <button onclick="showQuestSelection(${pQuest.id}, ${adv.id})">
                     試験を受ける
                 </button>
             `;
@@ -1221,9 +1268,9 @@ function showQuestSelection(questId, targetAdvId = null) {
             <td>${adv.name}</td>
             <td><span class="adventurer-rank" style="color: ${rankColor}; font-weight: bold;">${adv.rank}</span></td>
             <td>${adv.ovr}</td>
-            <td>${adv.skills.combat}</td>
-            <td>${adv.skills.magic}</td>
-            <td>${adv.skills.exploration}</td>
+            <td>${getStyledSkillHtml(adv.skills.combat)}</td>
+            <td>${getStyledSkillHtml(adv.skills.magic)}</td>
+            <td>${getStyledSkillHtml(adv.skills.exploration)}</td>
             <td>
                 ${adv.exp} / ${adv.expToLevelUp}
                 <div class="exp-bar-container">
@@ -1542,7 +1589,13 @@ function nextMonth() {
         showGameOverScreen();
         return; // ゲームオーバーなので以降の処理は行わない
     } else {
-        alert("新しい月になりました！\n\n" + summaryMessage);
+        // ★ 先月の記録をページに表示
+        if (logContentEl && lastMonthLogEl) {
+            // メッセージ内の強調マーク(**)を削除して表示
+            logContentEl.textContent = summaryMessage.replace(/\*\*/g, '');
+            lastMonthLogEl.style.display = 'block';
+        }
+        alert("新しい月になりました！");
     }
     
     updateDisplay();
@@ -1720,12 +1773,12 @@ function processAgingEffects() {
  * ゲームオーバー画面を表示します。
  */
 function showGameOverScreen() {
-    const gameContainer = document.getElementById('game-container');
-    gameContainer.innerHTML = `
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = `
         <h1>Game Over</h1>
         <p>ギルドの資金が底を尽き、運営を続けることができなくなりました...</p>
         <h2>ギルドの殿堂</h2>
-        <p>ギルドに在籍した冒険者たちの最も輝かしい記録です。</p>
+        <p>今回のプレイで活躍した冒険者たちです。「殿堂入り」ボタンを押すと、その冒険者の記録が永続的に保存されます。</p>
         <div id="hall-of-fame"></div>
         <div style="text-align: center; margin-top: 30px;">
             <button onclick="location.reload()">もう一度プレイする</button>
@@ -1748,6 +1801,7 @@ function showGameOverScreen() {
             <th>戦闘</th>
             <th>魔法</th>
             <th>探索</th>
+            <th>操作</th>
         </tr>
     `;
 
@@ -1756,7 +1810,8 @@ function showGameOverScreen() {
 
     sortedRecords.forEach(record => {
         const rankColor = getRankColor(record.peakRank);
-        table.innerHTML += `
+        const row = table.insertRow();
+        row.innerHTML = `
             <tr>
                 <td>${record.name}</td>
                 <td>${record.gender}</td>
@@ -1765,11 +1820,36 @@ function showGameOverScreen() {
                 <td>${record.peakSkills.combat}</td>
                 <td>${record.peakSkills.magic}</td>
                 <td>${record.peakSkills.exploration}</td>
+                <td><button id="induct-btn-${record.id}" onclick="inductToHallOfFame(${record.id})">殿堂入り</button></td>
             </tr>
         `;
     });
 
     hallOfFameEl.appendChild(table);
+}
+
+/**
+ * 指定された冒険者をギルドの殿堂に登録します。
+ * @param {number} advId - 殿堂入りさせる冒険者のID
+ */
+function inductToHallOfFame(advId) {
+    const recordToInduct = allTimeAdventurers[advId];
+    if (!recordToInduct) return;
+
+    // 既存の殿堂データを取得
+    const pastRecords = JSON.parse(localStorage.getItem('guildSoulHallOfFame') || '{}');
+    
+    // 新しい記録を追加または更新
+    pastRecords[advId] = recordToInduct;
+
+    // localStorageに保存
+    localStorage.setItem('guildSoulHallOfFame', JSON.stringify(pastRecords));
+
+    // ボタンを無効化してフィードバック
+    const button = document.getElementById(`induct-btn-${advId}`);
+    button.textContent = '殿堂入り済';
+    button.disabled = true;
+    alert(`「${recordToInduct.name}」をギルドの殿堂に登録しました。`);
 }
 
 // --- チュートリアル機能 ---
@@ -1899,7 +1979,7 @@ function startGame(withTutorial) {
 
     // ゲーム状態をリセット（必要に応じて）
     // ここではグローバル変数を初期値に戻す
-    gold = 100;
+    gold = 500;
     adventurers = [];
     scoutCandidates = [];
     scoutSkill = 100;
@@ -1911,6 +1991,11 @@ function startGame(withTutorial) {
 
     // ゲームの初期表示を更新
     updateDisplay();
+
+    // ログ表示を隠す
+    if (lastMonthLogEl) {
+        lastMonthLogEl.style.display = 'none';
+    }
 
     if (withTutorial) {
         startTutorial();
@@ -1935,6 +2020,29 @@ function showPastRecords() {
 }
 
 /**
+ * 指定された冒険者をギルドの殿堂から削除します。
+ * @param {number} advId - 削除する冒険者のID
+ */
+function removeFromHallOfFame(advId) {
+    const pastRecords = JSON.parse(localStorage.getItem('guildSoulHallOfFame') || '{}');
+    const recordToRemove = pastRecords[advId];
+
+    if (!recordToRemove) {
+        alert('削除対象の記録が見つかりません。');
+        return;
+    }
+
+    if (confirm(`「${recordToRemove.name}」の記録を殿堂から完全に削除しますか？\nこの操作は元に戻せません。`)) {
+        delete pastRecords[advId];
+        localStorage.setItem('guildSoulHallOfFame', JSON.stringify(pastRecords));
+        alert(`「${recordToRemove.name}」の記録を削除しました。`);
+
+        // 表示を再描画
+        showPastRecords();
+    }
+}
+
+/**
  * ギルドの殿堂を描画します。
  * @param {Object} records - 表示する冒険者の記録
  * @param {string} containerId - 描画先のコンテナID
@@ -1950,7 +2058,7 @@ function renderHallOfFame(records, containerId) {
     table.innerHTML = `
         <tr>
             <th>名前</th><th>性別</th><th>最高ランク</th><th>最高OVR</th>
-            <th>戦闘</th><th>魔法</th><th>探索</th>
+            <th>戦闘</th><th>魔法</th><th>探索</th><th>操作</th>
         </tr>
     `;
 
@@ -1962,8 +2070,8 @@ function renderHallOfFame(records, containerId) {
         row.innerHTML = `
             <td>${record.name}</td><td>${record.gender}</td>
             <td><span class="adventurer-rank" style="color: ${rankColor}; font-weight: bold;">${record.peakRank}</span></td>
-            <td>${record.peakOvr}</td><td>${record.peakSkills.combat}</td>
-            <td>${record.peakSkills.magic}</td><td>${record.peakSkills.exploration}</td>
+            <td>${record.peakOvr}</td><td>${record.peakSkills.combat}</td><td>${record.peakSkills.magic}</td>
+            <td>${record.peakSkills.exploration}</td><td><button onclick="removeFromHallOfFame(${record.id})">削除</button></td>
         `;
     });
 
