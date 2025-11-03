@@ -508,6 +508,9 @@ function renderAdventurerList() {
         return;
     }
 
+    // OVRの高い順にソート
+    const sortedAdventurers = [...adventurers].sort((a, b) => b.ovr - a.ovr);
+
     const table = document.createElement('table');
     table.innerHTML = `
         <tr>
@@ -525,7 +528,7 @@ function renderAdventurerList() {
         </tr>
     `;
 
-    adventurers.forEach(adv => {
+    sortedAdventurers.forEach(adv => {
         const row = table.insertRow();
         
         // ★★★ 状態の変更: クエスト予定 ★★★
@@ -1907,7 +1910,7 @@ function showTutorialStep(step) {
                 if (assignButton) {
                     assignButton.addEventListener('click', advanceTutorial, { once: true });
                 }
-                tutorialText.textContent = '頼もしい仲間が増えました！「ランダムに任務を割り当て」ボタンで、彼らに効率よく仕事を割り振りましょう。';
+                tutorialText.textContent = '頼もしい仲間が増えました！「おすすめ任務を割り当て」ボタンで、彼らに効率よく仕事を割り振りましょう。';
                 break;
             }
         case 4: // Next Month誘導
