@@ -8,56 +8,79 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="game-container">
-        <h1>ギルド・ソウル</h1>
-
-        <div id="time-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 10px; background: #f0f0f0;">
-            <p style="font-size: 1.2em; margin: 0;">🗓️ 現在の月: <strong id="month">1年目の 1月</strong></p>
-            <button onclick="nextMonth()" style="padding: 10px 20px; font-weight: bold; background-color: #4CAF50; color: white; border: none; cursor: pointer;">
-                ▶️ Next Month
-            </button>
-        </div>
-        
-        <div id="stats">
-            <p><strong>資金:</strong> <span id="gold">100</span> 万G</p>
-            <p><strong>冒険者数:</strong> <span id="adventurer-count">0</span> 人</p>
-            <p><strong>スカウト能力:</strong> <span id="scout-skill">100</span></p> 
+    <div id="main-content">
+        <div id="home-screen">
+            <h1>ギルド・ソウル</h1>
+            <div class="home-controls">
+                <button onclick="startGame(true)">スタート：初心者</button>
+                <button onclick="startGame(false)">スタート：上級者</button>
+                <button onclick="showPastRecords()">過去の記録</button>
+            </div>
         </div>
 
-        <hr>
+        <div id="game-container" style="display: none;">
+            <div id="time-controls" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 10px; background: #f0f0f0;">
+                <p style="font-size: 1.2em; margin: 0;">🗓️ 現在の月: <strong id="month">1年目の 1月</strong></p>
+                <button onclick="nextMonth()" style="padding: 10px 20px; font-weight: bold; background-color: #4CAF50; color: white; border: none; cursor: pointer;">
+                    ▶️ Next Month
+                </button>
+            </div>
+            
+            <div id="stats">
+                <p><strong>資金:</strong> <span id="gold">100</span> 万G</p>
+                <p><strong>冒険者数:</strong> <span id="adventurer-count">0</span> 人</p>
+                <p><strong>スカウト能力:</strong> <span id="scout-skill">100</span></p> 
+            </div>
 
-        <h2>🛡️ ギルド運営 - アクション</h2>
-        <div class="controls" id="action-controls">
-            <button onclick="autoAssignQuests()">ランダムに任務を割り当て</button>
-            <button id="upgrade-scout-button" onclick="upgradeScoutSkill()">スカウト能力を強化</button>
+            <hr>
+
+            <div id="action-section">
+                <h2>🛡️ ギルド運営 - アクション</h2>
+                <div class="controls" id="action-controls">
+                    <div id="auto-assign-wrapper">
+                        <button onclick="autoAssignQuests()">ランダムに任務を割り当て</button>
+                    </div>
+                    <div id="upgrade-scout-wrapper">
+                        <button id="upgrade-scout-button" onclick="upgradeScoutSkill()">スカウト能力を強化</button>
+                    </div>
+                </div>
+            </div>
+            <hr>
+
+            <div id="scout-section">
+                <h2>🛡️ ギルド管理 - スカウト</h2>
+                <div class="controls" id="scout-controls">
+                    <button onclick="scoutAdventurers('immediate')">即戦力重視 (5 万G)</button> 
+                    <button onclick="scoutAdventurers('growth')">成長重視 (5 万G)</button> 
+                    <button onclick="scoutAdventurers('focused')">集中スカウト (30 万G)</button>
+                </div>
+            </div>
+            <hr>
+
+            <div id="scout-area" style="display: none;">
+                </div>
+
+            <h2>所属冒険者リスト</h2>
+            <div id="adventurer-list">
+                </div>
+
+            <hr>
+
+            <div id="quests">
+                </div>
+
+            <div id="quest-detail-area" style="display: none;">
+                </div>
         </div>
-        <hr>
-
-        <h2>🛡️ ギルド管理 - スカウト</h2>
-        <div class="controls" id="scout-controls">
-            <button onclick="scoutAdventurers('immediate')">即戦力重視 (5 万G)</button> 
-            <button onclick="scoutAdventurers('growth')">成長重視 (5 万G)</button> 
-            <button onclick="scoutAdventurers('focused')">集中スカウト (30 万G)</button>
-        </div>
-        <hr>
-
-        <div id="scout-area" style="display: none;">
-            </div>
-
-        <h2>👨‍👩‍👧‍👦 所属冒険者リスト</h2>
-        <div id="adventurer-list">
-            </div>
-
-        <hr>
-
-        <div id="quests">
-            </div>
-
-        <div id="quest-detail-area" style="display: none;">
-            </div>
-        
     </div>
     
+    <!-- チュートリアル用オーバーレイ -->
+    <div id="tutorial-overlay" style="display: none;">
+        <div id="tutorial-message-box">
+            <p id="tutorial-text"></p>
+            <button id="tutorial-next-button" style="display: none;" onclick="advanceTutorial()">次へ</button>
+        </div>
+    </div>
     <script src="game.js"></script>
 </body>
 </html>
