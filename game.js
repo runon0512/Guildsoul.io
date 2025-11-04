@@ -67,18 +67,18 @@ const PROMOTION_BASE_SUCCESS_RATE = 50;
 const SCOUT_POLICIES = {
     immediate: { 
         name: "即戦力重視", 
-        cost: 5, // 5万G
-        minAge: 25, 
-        maxAge: 35, 
+        cost: 100, // 100万G
+        minAge: 20, 
+        maxAge: 30, 
         baseBonus: 8, 
         limit: 10, 
         maxJoin: Infinity 
     },
     growth: { 
         name: "成長重視", 
-        cost: 5, // 5万G
+        cost: 100, // 100万G
         minAge: 18, 
-        maxAge: 24, 
+        maxAge: 20, 
         baseBonus: -3, 
         limit: 10, 
         maxJoin: Infinity 
@@ -86,8 +86,8 @@ const SCOUT_POLICIES = {
     focused: { 
         name: "集中スカウト", 
         cost: 30, // 30万G
-        minAge: 30, 
-        maxAge: 40, 
+        minAge: 28, 
+        maxAge: 36, 
         baseBonus: 50, 
         limit: 1, // 候補者数1名に固定
         maxJoin: 1 // 加入できるのも1名に固定
@@ -141,6 +141,20 @@ let quests = [
 
     // XXランク以上
     { id: 91, name: "創世の神々への挑戦", reward: 5000, difficulty: 600, available: true, requiredRank: 'XX', aptitudes: { combat: 200, magic: 200, exploration: 200 } },
+];
+
+// ★ ストーリー任務の定義
+const STORY_QUESTS = [
+    { year: 1,  id: 2001, name: "【ストーリー任務】古代の門の守護者", difficulty: 150,  aptitudes: { combat: 100, magic: 100, exploration: 100 } },
+    { year: 2,  id: 2002, name: "【ストーリー任務】影の軍団の偵察",   difficulty: 250,  aptitudes: { combat: 150, magic: 150, exploration: 150 } },
+    { year: 3,  id: 2003, name: "【ストーリー任務】魔将軍の砦",       difficulty: 400,  aptitudes: { combat: 200, magic: 200, exploration: 200 } },
+    { year: 4,  id: 2004, name: "【ストーリー任務】天空竜の試練",     difficulty: 600,  aptitudes: { combat: 250, magic: 250, exploration: 250 } },
+    { year: 5,  id: 2005, name: "【ストーリー任務】深淵への道",       difficulty: 850,  aptitudes: { combat: 290, magic: 290, exploration: 290 } },
+    { year: 6,  id: 2006, name: "【ストーリー任務】失われた王の魂",   difficulty: 1150, aptitudes: { combat: 330, magic: 330, exploration: 330 } },
+    { year: 7,  id: 2007, name: "【ストーリー任務】星の詠み手",       difficulty: 1500, aptitudes: { combat: 370, magic: 370, exploration: 370 } },
+    { year: 8,  id: 2008, name: "【ストーリー任務】次元の捕食者",     difficulty: 2000, aptitudes: { combat: 400, magic: 400, exploration: 400 } },
+    { year: 9,  id: 2009, name: "【ストーリー任務】神々の黄昏",       difficulty: 2800, aptitudes: { combat: 450, magic: 450, exploration: 450 } },
+    { year: 10, id: 2010, name: "【ストーリー任務】世界の夜明け",     difficulty: 4000, aptitudes: { combat: 480, magic: 480, exploration: 480 } }
 ];
 
 
@@ -530,6 +544,14 @@ function updateDisplay() {
     renderQuests();
 }
 
+// ★ おすすめ割り当てボタンの表示/非表示を制御
+function updateAutoAssignButtonVisibility() {
+    const autoAssignWrapper = document.getElementById('auto-assign-wrapper');
+    if (autoAssignWrapper) {
+        autoAssignWrapper.style.display = (currentMonth === 12) ? 'none' : 'block';
+    }
+}
+
 
 
 // --- 冒険者リストの表示 (キャンセルボタンを追加) ---
@@ -587,9 +609,9 @@ function renderAdventurerList() {
             `;
         }
 
-        // ★ 表示用の年俸を「月給 x 12」で再計算
-        const monthlySalary = Math.ceil(adv.annualSalary / 12);
-        const displayedAnnualSalary = monthlySalary * 12;
+        // ★ 表示用の年俸を「月給 x 11」で再計算
+        const monthlySalary = Math.ceil(adv.annualSalary / 11);
+        const displayedAnnualSalary = monthlySalary * 11;
 
         row.innerHTML = `
             <td><span class="adventurer-name" style="border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;">${adv.name}</span></td><td>${adv.gender}/${adv.age}歳</td>
@@ -786,8 +808,8 @@ function retireAdventurer(advId) {
     // その年の残り月数（今月分も含む） x 月給
     const remainingMonths = 12 - currentMonth + 1;
     // ★ 引退時点の最新のOVR/ランクで年俸を再計算して月給を算出
-    const currentAnnualSalary = calculateAnnualSalary(adv.ovr, adv.rank);
-    const monthlySalary = Math.ceil(currentAnnualSalary / 12);
+    // 現在の契約年俸から月給を算出
+    const monthlySalary = Math.ceil(adv.annualSalary / 11);
     const severancePay = monthlySalary * remainingMonths;
 
     const confirmationMessage = `冒険者「${adv.name}」を引退させますか？\n\n` +
@@ -1108,6 +1130,44 @@ function renderQuests() {
     questDetailAreaEl.style.display = 'none'; 
     adventurerListEl.style.display = 'block'; 
 
+    // ★ おすすめ割り当てボタンの表示を更新
+    updateAutoAssignButtonVisibility();
+
+    // ★ 12月はストーリー任務のみ表示
+    if (currentMonth === 12) {
+        // その年のストーリー任務を取得
+        const storyQuest = STORY_QUESTS.find(sq => sq.year === currentYear);
+        // ストーリー任務が既に派遣予定に入っているか確認
+        const isStoryQuestInProgress = questsInProgress.some(qData => qData.quest.id === storyQuest?.id);
+
+        if (storyQuest && !isStoryQuestInProgress) { // ★ 派遣予定に入っていない場合のみ表示
+            const questDiv = document.createElement('div');
+            questDiv.className = 'quest-item story-quest'; // 特別なクラスを付与
+            questDiv.innerHTML = `
+                <h3>${storyQuest.name}</h3>
+                <p style="color: #ff4757; font-weight: bold;">【警告】この任務に失敗するとゲームオーバーです。</p>
+                <p><strong>報酬:</strong> ???</p>
+                <p><strong>適正能力 (難易度合計: ${storyQuest.difficulty})</strong></p>
+                <ul>
+                    <li>戦闘: ${storyQuest.aptitudes.combat}</li>
+                    <li>魔法: ${storyQuest.aptitudes.magic}</li>
+                    <li>探索: ${storyQuest.aptitudes.exploration}</li>
+                </ul>
+                <button onclick="showQuestSelection(${storyQuest.id})">
+                    派遣メンバーを選択
+                </button>
+            `;
+            questsEl.appendChild(questDiv);
+        } else {
+            // ストーリー任務がない、または既に派遣予定の場合のメッセージ
+            const message = isStoryQuestInProgress 
+                ? '<p>ストーリー任務は派遣予定です。結果は「Next Month」で確認できます。</p>'
+                : '<p>今年のストーリー任務はありません。</p>';
+            questsEl.innerHTML = message;
+        }
+        return; // 通常クエストの描画をスキップ
+    }
+
     let hasAvailableQuest = false;
 
     // --- 昇級試験クエストの生成とソート ---
@@ -1230,6 +1290,8 @@ function showQuestSelection(questId, targetAdvId = null) {
     let quest, nextRank;
     // 昇級試験の判定はID >= 1000 または targetAdvId があるかで判断する
     const isPromotion = questId >= 1000 && targetAdvId !== null;
+    // ★ ストーリー任務の判定 (IDが2000番台)
+    const isStoryQuest = questId >= 2001 && questId <= 2010;
 
     if (isPromotion) {
         const adv = adventurers.find(a => a.id === targetAdvId);
@@ -1251,7 +1313,15 @@ function showQuestSelection(questId, targetAdvId = null) {
         };
         // クエスト一覧から元のクエストを見つける
     } else {
-        quest = quests.find(q => q.id === questId);
+        // ★ ストーリー任務の場合
+        if (isStoryQuest) {
+            quest = STORY_QUESTS.find(sq => sq.id === questId);
+            quest.reward = 0; // 報酬はなし
+            quest.isStory = true; // ★ ストーリー任務フラグ
+        } else {
+            // 通常クエストの場合
+            quest = quests.find(q => q.id === questId);
+        }
     }
 
     if (!quest) return;
@@ -1272,15 +1342,20 @@ function showQuestSelection(questId, targetAdvId = null) {
     }
     aptitudesText = aptitudesText.substring(0, aptitudesText.length - 3);
 
-    const maxAdventurers = quest.isPromotion ? 1 : 4;
+    const maxAdventurers = quest.isPromotion ? 1 : 4; // ★ ストーリーも4人まで
     const selectionInfo = quest.isPromotion 
         ? `<p style="color:red; font-weight:bold;">この試験は${adventurers.find(a => a.id === targetAdvId).name}単独での受験となります。他メンバーは選択できません。</p>`
+        : quest.isStory
+        ? `<p style="color:red; font-weight:bold;">ギルドの存亡をかけた戦いです。待機中のメンバーから精鋭を選び、任務に挑みます (最大${maxAdventurers}名)。</p>`
         : `<p><strong>派遣する冒険者を選択してください (最大${maxAdventurers}名):</strong></p>`;
+
+    const rewardText = quest.isStory ? '任務成功で次年へ' : `${quest.reward} 万G`;
+    const difficultyText = quest.isPromotion ? `目標OVR: ${quest.difficulty}` : `適正能力 (目標合計: ${quest.difficulty})`;
 
 
     questDetailAreaEl.innerHTML += `
-        <p><strong>報酬:</strong> ${quest.reward} 万G</p>
-        <p><strong>適正能力 (目標OVR):</strong> ${quest.difficulty}</p>
+        <p><strong>報酬:</strong> ${rewardText}</p>
+        <p><strong>${difficultyText}</strong></p>
         <p style="font-size: 0.9em;">※獲得経験値は成功率に応じて変動し、さらに**年齢とランク**による倍率が適用されます。</p>
         ${selectionInfo}
 
@@ -1303,7 +1378,7 @@ function showQuestSelection(questId, targetAdvId = null) {
                 <th>獲得予定EXP (成功時)</th> </tr>
         </table>
         <div style="text-align: center; margin-top: 20px;">
-            <button id="send-quest-button" ${quest.isPromotion ? 'class="promotion-dispatch-button"' : ''} onclick="sendAdventurersToQuest(${quest.id}, ${quest.isPromotion}, ${quest.isPromotion ? targetAdvId : null})" disabled>派遣予定に入れる</button>
+            <button id="send-quest-button" ${quest.isPromotion ? 'class="promotion-dispatch-button"' : (quest.isStory ? 'class="story-dispatch-button"' : '')} onclick="sendAdventurersToQuest(${quest.id}, ${quest.isPromotion}, ${quest.isPromotion ? targetAdvId : null})" disabled>派遣予定に入れる</button>
             <button onclick="cancelQuestSelection()">キャンセル</button>
         </div>
     `;
@@ -1325,13 +1400,13 @@ function showQuestSelection(questId, targetAdvId = null) {
         availableAdventurers = availableAdventurers.filter(adv => adv.id === targetAdvId);
     }
 
-
     availableAdventurers.forEach(adv => {
         const row = table.insertRow();
         const expPercentage = Math.min(100, (adv.exp / adv.expToLevelUp) * 100);
         
         // 昇級試験の場合はチェックボックスを強制的にチェック済み・無効化
         const checked = quest.isPromotion ? 'checked disabled' : '';
+
 
         row.innerHTML = `
             <td><input type="checkbox" name="quest-adv-select" value="${adv.id}" ${checked}></td>
@@ -1476,7 +1551,7 @@ function updateQuestSuccessRate(quest) {
     
     // EXPプレビューの基本値（年齢補正前）を計算
     const gainedBaseExp = selectedAdventurers.length > 0 ? calculateQuestEXP(rate) : 0; 
-    // 昇級試験はEXP半減
+    // 昇級試験・ストーリー任務はEXP半減
     const expModifier = quest.isPromotion ? 0.5 : 1.0; 
 
     const rateEl = document.getElementById('current-success-rate');
@@ -1520,7 +1595,7 @@ function updateQuestSuccessRate(quest) {
     if (quest.isPromotion) {
         sendButton.disabled = selectedAdventurers.length !== 1;
     } else {
-        // 通常クエストは最大4人
+        // 通常・ストーリークエストは最大4人
         sendButton.disabled = selectedAdventurers.length === 0 || selectedAdventurers.length > 4;
     }
 }
@@ -1538,6 +1613,8 @@ function sendAdventurersToQuest(questId, isPromotion, targetAdvId = null) {
     const sentAdventurers = adventurers.filter(adv => selectedIds.includes(adv.id));
 
     let quest; // ★関数のスコープで変数を宣言
+    // ★ ストーリー任務の判定
+    const isStoryQuest = questId >= 2001 && questId <= 2010;
 
     if (isPromotion) {
         const adv = sentAdventurers[0];
@@ -1551,6 +1628,11 @@ function sendAdventurersToQuest(questId, isPromotion, targetAdvId = null) {
             isPromotion: true,
         };
         sendAdventurersToQuestInternal(quest, sentAdventurers);
+    } else if (isStoryQuest) {
+        quest = STORY_QUESTS.find(sq => sq.id === questId);
+        quest.isStory = true;
+        sendAdventurersToQuestInternal(quest, sentAdventurers);
+
     } else {
         quest = quests.find(q => q.id === questId); // ★constを削除し、変数に代入する
         if (!quest) return;
@@ -1604,6 +1686,16 @@ function processYearEnd() {
  * 月を進める機能（Next Monthボタンに対応）
  */
 function nextMonth() {
+    // ★ 12月の場合、ストーリー任務がセットされているかチェック
+    if (currentMonth === 12) {
+        const hasStoryQuestInProgress = questsInProgress.some(qData => qData.quest.isStory);
+        if (!hasStoryQuestInProgress) {
+            alert('【ストーリー任務】が派遣予定に入っていません。\nギルドの存亡をかけた任務です。必ずメンバーを派遣してください。');
+            return; // 処理を中断
+        }
+    }
+
+
     const previousMonth = currentMonth;
     const previousYear = currentYear;
     let yearEndMessage = '';
@@ -1622,7 +1714,14 @@ function nextMonth() {
         summaryMessage += "前月に派遣予定のクエストはありませんでした。\n";
     }
 
-    // 2. 年末処理 (クエスト処理の後に行う)
+    // 2. 冒険者への給与支払い処理 (12月以外)
+    let monthlySalaryExpense = 0;
+    if (previousMonth !== 12) {
+        monthlySalaryExpense = payMonthlySalary();
+        totalExpense += monthlySalaryExpense;
+    }
+
+    // 3. 年末処理 (給与支払いの後に行う)
     if (previousMonth === 12) {
         yearEndMessage = processYearEnd();
         currentYear++;
@@ -1630,12 +1729,8 @@ function nextMonth() {
     } else {
         currentMonth++;
     }
-
-    // 3. 冒険者への給与支払い処理
-    const monthlySalaryExpense = payMonthlySalary();
-    totalExpense += monthlySalaryExpense;
     
-    // 4. 加齢による能力低下処理を追加
+    // 4. 加齢による能力低下処理
     const agingMessage = processAgingEffects();
     if (agingMessage) {
         summaryMessage += agingMessage;
@@ -1694,7 +1789,7 @@ function processQuestsResults() {
 
         // EXP計算の基本値（成功/失敗共通）
         const gainedBaseExp = calculateQuestEXP(successRate); 
-        // 昇級試験はEXP半減
+        // 昇級試験・ストーリー任務はEXP半減
         const expModifier = quest.isPromotion ? 0.5 : 1.0; 
         let totalGainedExp = 0;
 
@@ -1718,7 +1813,18 @@ function processQuestsResults() {
 
 
         if (success) {
-            if (quest.isPromotion) {
+            // ★ ストーリー任務成功
+            if (quest.isStory) {
+                // 10年目クリアでゲームクリア
+                if (currentYear === 10) {
+                    showGameClearScreen();
+                    return; // ゲームクリアなのでここで処理を終了
+                }
+                resultMessage = `✅ 成功: ギルドは存続し、新年を迎えることができます！ (獲得EXP(平均): ${averageGainedExp}P)`;
+                // 報酬はないが、メッセージとして表示
+                promotionMessages.push(`🎉 【${quest.name}】に成功しました！`);
+
+            } else if (quest.isPromotion) {
                 // 昇級試験成功
                 const adv = sentAdventurers[0];
                 const currentRankIndex = RANKS.indexOf(adv.rank);
@@ -1740,6 +1846,13 @@ function processQuestsResults() {
             }
 
         } else {
+            // ★ ストーリー任務失敗 → ゲームオーバー
+            if (quest.isStory) {
+                showGameOverScreen(`【${quest.name}】に失敗... ギルドの挑戦はここで終わりを告げた。`);
+                return; // ゲームオーバーなのでここで処理を終了
+            }
+
+
             if (quest.isPromotion) {
                 // 昇級試験失敗
                 const adv = sentAdventurers[0];
@@ -1790,7 +1903,7 @@ function processQuestsResults() {
 function payMonthlySalary() {
     let totalMonthlySalary = 0;
     adventurers.forEach(adv => {
-        const monthlySalary = Math.ceil(adv.annualSalary / 12); 
+        const monthlySalary = Math.ceil(adv.annualSalary / 11); 
         totalMonthlySalary += monthlySalary;
     });
     
@@ -1844,11 +1957,15 @@ function processAgingEffects() {
 /**
  * ゲームオーバー画面を表示します。
  */
-function showGameOverScreen() {
+function showGameOverScreen(customMessage = null) {
     const mainContent = document.getElementById('main-content');
+    const gameOverReason = customMessage 
+        ? customMessage 
+        : 'ギルドの資金が底を尽き、運営を続けることができなくなりました...';
+
     mainContent.innerHTML = `
         <h1>Game Over</h1>
-        <p>ギルドの資金が底を尽き、運営を続けることができなくなりました...</p>
+        <p>${gameOverReason}</p>
         <h2>ギルドの殿堂</h2>
         <p>今回のプレイで活躍した冒険者たちです。「殿堂入り」ボタンを押すと、その冒険者の記録が永続的に保存されます。</p>
         <div id="hall-of-fame"></div>
@@ -1857,7 +1974,31 @@ function showGameOverScreen() {
         </div>
     `;
 
-    const hallOfFameEl = document.getElementById('hall-of-fame');
+    renderHallOfFameTable('hall-of-fame');
+}
+
+function showGameClearScreen() {
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = `
+        <h1>Congratulations!</h1>
+        <p>10年にわたるギルドの物語は、輝かしい勝利と共に幕を閉じました。<br>あなたの導きによって、ギルドの名は伝説として永遠に語り継がれるでしょう！</p>
+        <h2>ギルドの殿堂</h2>
+        <p>今回のプレイで活躍した冒険者たちです。「殿堂入り」ボタンを押すと、その冒険者の記録が永続的に保存されます。</p>
+        <div id="hall-of-fame"></div>
+        <div style="text-align: center; margin-top: 30px;">
+            <button onclick="location.reload()">もう一度プレイする</button>
+        </div>
+    `;
+
+    renderHallOfFameTable('hall-of-fame');
+}
+
+/**
+ * ゲームオーバー/クリア画面に殿堂テーブルを描画します。
+ * @param {string} containerId - 描画先のコンテナID
+ */
+function renderHallOfFameTable(containerId) {
+    const hallOfFameEl = document.getElementById(containerId);
     if (Object.keys(allTimeAdventurers).length === 0) {
         hallOfFameEl.innerHTML = '<p>ギルドには誰も所属していませんでした...</p>';
         return;
@@ -2066,6 +2207,7 @@ function startGame(withTutorial) {
     allTimeAdventurers = {};
 
     // ゲームの初期表示を更新
+    updateAutoAssignButtonVisibility();
     updateDisplay();
 
     // ログ表示を隠す
@@ -2158,10 +2300,14 @@ function renderHallOfFame(records, containerId) {
 
 /**
  * 現在のゲーム状態をオブジェクトとして取得します。
+ * @param {string} dataName - セーブデータの名前
+ * @param {string} memo - セーブデータに関するメモ
  * @returns {Object} ゲーム状態オブジェクト
  */
-function getGameState() {
+function getGameState(dataName, memo) {
     return {
+        dataName: dataName || `無題のデータ`,
+        memo: memo || '',
         gold,
         adventurers,
         scoutCandidates,
@@ -2185,7 +2331,23 @@ function loadGameState(gameState) {
     adventurers = gameState.adventurers;
     scoutCandidates = gameState.scoutCandidates;
     scoutSkill = gameState.scoutSkill;
-    questsInProgress = gameState.questsInProgress;
+    // ★ ロード時に questsInProgress の参照を再構築する
+    questsInProgress = gameState.questsInProgress.map(qData => {
+        // 冒険者オブジェクトの参照を現在のadventurersリストから再取得
+        const rehydratedAdventurers = qData.adventurers.map(savedAdv => 
+            adventurers.find(adv => adv.id === savedAdv.id)
+        ).filter(Boolean); // 見つからなかった冒険者を除外
+
+        // クエストオブジェクトの参照を現在のクエストリストから再取得
+        let rehydratedQuest = quests.find(q => q.id === qData.quest.id);
+        if (!rehydratedQuest) {
+            // 昇級試験やストーリー任務の場合、元のリストには存在しないため、保存されたオブジェクトをそのまま使う
+            rehydratedQuest = qData.quest;
+        }
+
+        return { ...qData, quest: rehydratedQuest, adventurers: rehydratedAdventurers };
+    });
+
     nextAdventurerId = gameState.nextAdventurerId;
     currentMonth = gameState.currentMonth;
     currentYear = gameState.currentYear;
@@ -2199,11 +2361,24 @@ function loadGameState(gameState) {
         }
     });
 
-    // UIを全て更新
-    updateDisplay();
-    cancelScout();
-    cancelQuestSelection();
+    // --- UIの完全リセットと再描画 ---
+    // 1. ホーム画面を隠し、ゲームコンテナを表示
+    const homeScreen = document.getElementById('home-screen');
+    const gameContainer = document.getElementById('game-container');
+    if (homeScreen) homeScreen.style.display = 'none';
+    if (gameContainer) gameContainer.style.display = 'block';
+
+    // 2. チュートリアルやセーブ/ロードモーダルなど、他の表示を全て閉じる
+    if (tutorialOverlay) tutorialOverlay.style.display = 'none';
+    if (saveLoadModal) saveLoadModal.style.display = 'none';
+    if (lastMonthLogEl) lastMonthLogEl.style.display = 'none';
+
+    // 3. スカウト画面やクエスト詳細画面を閉じてから、メインの表示を更新する
+    cancelScout(); // スカウト画面をリセット
+    cancelQuestSelection(); // クエスト詳細画面をリセット (内部でupdateDisplayが呼ばれる)
+
     alert('ゲームデータをロードしました。');
+
 }
 
 /**
@@ -2222,12 +2397,13 @@ function showSaveLoadModal(mode) {
         const slotDiv = document.createElement('div');
         slotDiv.className = 'save-slot';
 
-        let slotInfo = `<p><strong>スロット ${i}</strong></p>`;
+        let slotInfo = `<h4>スロット ${i}</h4>`;
         if (savedData) {
             slotInfo += `
-                <p>${savedData.currentYear}年 ${savedData.currentMonth}月</p>
-                <p>所持金: ${savedData.gold}万G</p>
-                <p>保存日時: ${savedData.saveDate}</p>
+                <p class="save-data-name">${savedData.dataName || '無題のデータ'}</p>
+                <p class="save-data-memo">${savedData.memo || 'メモはありません'}</p>
+                <p class="save-data-details">${savedData.currentYear}年 ${savedData.currentMonth}月 / 所持金: ${savedData.gold}万G</p>
+                <p class="save-data-date">保存日時: ${savedData.saveDate}</p>
             `;
         } else {
             slotInfo += '<p>空きスロット</p>';
@@ -2256,11 +2432,23 @@ function closeSaveLoadModal() {
 }
 
 function saveGame(slot) {
-    if (!confirm(`スロット${slot}に現在のゲームデータをセーブしますか？`)) return;
-    const gameState = getGameState();
+    const defaultName = `${currentYear}年${currentMonth}月 ギルドデータ`;
+    const dataName = prompt(`セーブデータの名前を入力してください（スロット${slot}）`, defaultName);
+    // ユーザーがキャンセルした場合は処理を中断
+    if (dataName === null) {
+        return;
+    }
+
+    const memo = prompt("このセーブデータに関するメモを残しますか？（任意）", "");
+    // ユーザーがキャンセルした場合は処理を中断
+    if (memo === null) {
+        return;
+    }
+
+    const gameState = getGameState(dataName, memo);
     localStorage.setItem(`guildSoulSaveSlot${slot}`, JSON.stringify(gameState));
-    alert(`スロット${slot}にセーブしました。`);
-    closeSaveLoadModal();
+    alert(`「${dataName}」をスロット${slot}にセーブしました。`);
+    showSaveLoadModal('save'); // モーダルを再描画して更新を反映
 }
 
 function loadGame(slot) {
