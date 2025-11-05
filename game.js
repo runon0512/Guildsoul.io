@@ -1,5 +1,6 @@
 // --- ゲームの状態 ---
 let gold = 500; // 資金を500万Gに変更
+let gameDifficulty = 'hard'; // ★ 難易度を追加 ('easy' or 'hard')
 let adventurers = []; // ギルドに所属する冒険者
 let scoutCandidates = []; // スカウト候補リスト
 let scoutSkill = 100; // ギルドのスカウト能力 (初期値100)
@@ -10,6 +11,22 @@ let currentYear = 1; // ★ 年を追加
 let allTimeAdventurers = {}; // ★ ゲームオーバー時のリザルト用に全期間の冒険者データを記録
 let tutorialStep = 0; // 0:off, 1:scout, 2:join, 3:assign, 4:next month
 let isInTutorial = false;
+
+let selectedDifficulty = 'hard'; // ホーム画面での選択を一時的に保持
+
+// --- 難易度設定 ---
+const DIFFICULTY_SETTINGS = {
+    easy: {
+        name: "イージー",
+        scoutCosts: { immediate: 10, growth: 10, focused: 30 },
+        questRewardMultiplier: 1.5
+    },
+    hard: {
+        name: "ハード",
+        scoutCosts: { immediate: 100, growth: 100, focused: 300 },
+        questRewardMultiplier: 1.0
+    }
+};
 
 
 // --- ランク定義 ---
@@ -66,8 +83,7 @@ const PROMOTION_BASE_SUCCESS_RATE = 50;
 // スカウト方針の定義 (費用を万G単位に調整)
 const SCOUT_POLICIES = {
     immediate: { 
-        name: "即戦力重視", 
-        cost: 100, // 100万G
+        name: "即戦力重視",
         minAge: 20, 
         maxAge: 30, 
         baseBonus: 8, 
@@ -75,8 +91,7 @@ const SCOUT_POLICIES = {
         maxJoin: Infinity 
     },
     growth: { 
-        name: "成長重視", 
-        cost: 100, // 100万G
+        name: "成長重視",
         minAge: 18, 
         maxAge: 20, 
         baseBonus: -3, 
@@ -84,8 +99,7 @@ const SCOUT_POLICIES = {
         maxJoin: Infinity 
     },
     focused: { 
-        name: "集中スカウト", 
-        cost: 300, // 300万G
+        name: "集中スカウト",
         minAge: 28, 
         maxAge: 36, 
         baseBonus: 50, 
@@ -206,6 +220,16 @@ function getStyledRankHtml(rank) {
         }
     }
     return `<span class="adventurer-rank" style="color: ${color}; font-weight: bold; text-shadow: ${textShadow};">${rank}</span>`;
+}
+
+/**
+ * 難易度に応じてクエスト報酬を計算します。
+ * @param {Object} quest - クエストオブジェクト
+ * @returns {number} 調整後の報酬額
+ */
+function getQuestReward(quest) {
+    const multiplier = DIFFICULTY_SETTINGS[gameDifficulty].questRewardMultiplier;
+    return Math.floor(quest.reward * multiplier);
 }
 
 /**
@@ -839,19 +863,21 @@ function retireAdventurer(advId) {
 // --- スカウト機能 (変更なし) ---
 function scoutAdventurers(policyKey) { 
     const policy = SCOUT_POLICIES[policyKey];
+    const cost = DIFFICULTY_SETTINGS[gameDifficulty].scoutCosts[policyKey];
 
     if (!policy) {
         alert("無効なスカウト方針が選択されました。");
         return;
     }
 
+
     if (adventurers.length >= 10) {
         alert('ギルドの人数が上限の10人に達しているため、新しい冒険者をスカウトできません。');
         return;
     }
 
-    if (gold < policy.cost) { 
-        alert(`資金が足りません。スカウト費用 ${policy.cost} 万Gが必要です。`);
+    if (gold < cost) {
+        alert(`資金が足りません。スカウト費用 ${cost} 万Gが必要です。`);
         return;
     }
 
@@ -873,7 +899,7 @@ function scoutAdventurers(policyKey) {
         attempts++;
     }
 
-    alert(`${policy.name}（${policy.cost} 万G）を適用しました。`
+    alert(`${policy.name}（${cost} 万G）を適用しました。`
         + `\n現在スカウト能力: ${scoutSkill}`
         + `\n対象年齢: ${policy.minAge}-${policy.maxAge}歳`
         + `\nOVR上限目安: ${MAX_OVR_CEILING} 程度です。`
@@ -1138,7 +1164,7 @@ function renderQuests() {
     // ★ 12月はストーリー任務のみ表示
     if (currentMonth === 12) {
         // その年のストーリー任務を取得
-        const storyQuest = STORY_QUESTS.find(sq => sq.year === currentYear);
+        const storyQuest = getStoryQuestForYear(currentYear);
         // ストーリー任務が既に派遣予定に入っているか確認
         const isStoryQuestInProgress = questsInProgress.some(qData => qData.quest.id === storyQuest?.id);
 
@@ -1147,7 +1173,7 @@ function renderQuests() {
             questDiv.className = 'quest-item story-quest'; // 特別なクラスを付与
             questDiv.innerHTML = `
                 <h3>${storyQuest.name}</h3>
-                <p style="color: #ff4757; font-weight: bold;">【警告】この任務に失敗するとゲームオーバーです。</p>
+                <p style="color: #ff4757; font-weight: bold;">【警告】この任務に失敗するとゲームオーバーです。</p> 
                 <p><strong>報酬:</strong> ???</p>
                 <p><strong>適正能力 (難易度合計: ${storyQuest.difficulty})</strong></p>
                 <ul>
@@ -1267,7 +1293,7 @@ function renderQuests() {
         questDiv.innerHTML = `
             <h3>${quest.name}</h3>
             ${rankRequirementHtml}
-            <p>報酬: ${quest.reward} 万G</p>
+            <p>報酬: ${getQuestReward(quest)} 万G</p>
             <p>適正能力: ${aptitudesText} (難易度合計: ${quest.difficulty})</p>
             <button onclick="showQuestSelection(${quest.id})">
                 派遣メンバーを選択
@@ -1317,7 +1343,7 @@ function showQuestSelection(questId, targetAdvId = null) {
     } else {
         // ★ ストーリー任務の場合
         if (isStoryQuest) {
-            quest = STORY_QUESTS.find(sq => sq.id === questId);
+            quest = getStoryQuestForYear(currentYear); // 年から取得
             quest.reward = 0; // 報酬はなし
             quest.isStory = true; // ★ ストーリー任務フラグ
         } else {
@@ -1351,7 +1377,7 @@ function showQuestSelection(questId, targetAdvId = null) {
         ? `<p style="color:red; font-weight:bold;">ギルドの存亡をかけた戦いです。待機中のメンバーから精鋭を選び、任務に挑みます (最大${maxAdventurers}名)。</p>`
         : `<p><strong>派遣する冒険者を選択してください (最大${maxAdventurers}名):</strong></p>`;
 
-    const rewardText = quest.isStory ? '任務成功で次年へ' : `${quest.reward} 万G`;
+    const rewardText = quest.isStory ? '任務成功で次年へ' : `${getQuestReward(quest)} 万G`;
     const difficultyText = quest.isPromotion ? `目標OVR: ${quest.difficulty}` : `適正能力 (目標合計: ${quest.difficulty})`;
 
 
@@ -1632,7 +1658,7 @@ function sendAdventurersToQuest(questId, isPromotion, targetAdvId = null) {
         };
         sendAdventurersToQuestInternal(quest, sentAdventurers);
     } else if (isStoryQuest) {
-        quest = STORY_QUESTS.find(sq => sq.id === questId);
+        quest = getStoryQuestForYear(currentYear);
         quest.isStory = true;
         sendAdventurersToQuestInternal(quest, sentAdventurers);
 
@@ -1680,7 +1706,7 @@ function updateProjectedBalance() {
     questsInProgress.forEach(qData => {
         // 昇級試験とストーリー任務は報酬がない
         if (!qData.quest.isPromotion && !qData.quest.isStory) {
-            projectedIncome += qData.quest.reward;
+            projectedIncome += getQuestReward(qData.quest);
         }
     });
 
@@ -1885,9 +1911,10 @@ function processQuestsResults() {
 
             } else {
                 // 通常クエスト成功
-                gold += quest.reward;
-                totalIncome += quest.reward;
-                resultMessage = `✅ 成功: +${quest.reward} 万G (獲得EXP(平均): ${averageGainedExp}P)`;
+                const actualReward = getQuestReward(quest);
+                gold += actualReward;
+                totalIncome += actualReward;
+                resultMessage = `✅ 成功: +${actualReward} 万G (獲得EXP(平均): ${averageGainedExp}P)`;
             }
 
         } else {
@@ -1906,7 +1933,7 @@ function processQuestsResults() {
 
             } else {
                 // 通常クエスト失敗
-                const penalty = Math.floor(quest.reward / 2);
+                const penalty = Math.floor(getQuestReward(quest) / 2);
                 gold -= penalty;
                 totalExpense += penalty;
                 resultMessage = `❌ 失敗: -${penalty} 万G (ペナルティ)`;
@@ -2232,12 +2259,14 @@ function showTutorialStep(step) {
 /**
  * ゲームを開始します。
  * @param {boolean} withTutorial - チュートリアルを実行するかどうか
+ * @param {string} difficulty - 'easy' または 'hard'
+ * ※ この関数はホーム画面の最終選択から呼び出される
  */
-function startGame(withTutorial) {
+function startGame(withTutorial, difficulty) {
     const homeScreen = document.getElementById('home-screen');
     const gameContainer = document.getElementById('game-container');
-
-    if (homeScreen) homeScreen.style.display = 'none';
+    gameDifficulty = difficulty;
+    if (homeScreen) homeScreen.style.display = 'none'; // ホーム画面全体を非表示に
     if (gameContainer) gameContainer.style.display = 'block';
 
     // ゲーム状態をリセット
@@ -2263,6 +2292,7 @@ function startGame(withTutorial) {
     if (withTutorial) {
         startTutorial();
     }
+    alert(`難易度「${DIFFICULTY_SETTINGS[difficulty].name}」でゲームを開始します。`);
 }
 
 /**
@@ -2352,6 +2382,7 @@ function renderHallOfFame(records, containerId) {
 function getGameState(dataName, memo) {
     return {
         dataName: dataName || `無題のデータ`,
+        difficulty: gameDifficulty, // ★ 難易度を保存
         memo: memo || '',
         gold,
         adventurers,
@@ -2372,6 +2403,7 @@ function getGameState(dataName, memo) {
  * @param {Object} gameState - ゲーム状態オブジェクト
  */
 function loadGameState(gameState) {
+    gameDifficulty = gameState.difficulty || 'hard'; // ★ 難易度をロード
     gold = gameState.gold;
     adventurers = gameState.adventurers;
     scoutCandidates = gameState.scoutCandidates;
@@ -2446,7 +2478,7 @@ function showSaveLoadModal(mode) {
         if (savedData) {
             slotInfo += `
                 <p class="save-data-name">${savedData.dataName || '無題のデータ'}</p>
-                <p class="save-data-memo">${savedData.memo || 'メモはありません'}</p>
+                <p class="save-data-memo">難易度: ${DIFFICULTY_SETTINGS[savedData.difficulty]?.name || '不明'} | ${savedData.memo || 'メモはありません'}</p>
                 <p class="save-data-details">${savedData.currentYear}年 ${savedData.currentMonth}月 / 所持金: ${savedData.gold}万G</p>
                 <p class="save-data-date">保存日時: ${savedData.saveDate}</p>
             `;
@@ -2585,11 +2617,28 @@ function renderStylishHomeScreen() {
     homeScreen.innerHTML = `
         <h1 class="home-title">Guild Soul</h1>
         <p class="home-subtitle">- ギルド運営シミュレーション -</p>
-        <div class="home-menu">
-            <button onclick="startGame(true)">はじめから (チュートリアル有り)</button>
-            <button onclick="startGame(false)">はじめから (チュートリアル無し)</button>
+        <div id="main-menu" class="home-menu">
+            <button onclick="showDifficultySelection()">はじめから</button>
             <button onclick="showSaveLoadModal('load')">ロード</button>
             <button onclick="showPastRecords()">過去の記録</button>
+        </div>
+        <div id="difficulty-selection" class="home-menu" style="display: none;">
+            <h3>難易度を選択してください</h3>
+            <button onclick="showTutorialSelection('easy')">
+                イージー
+                <span style="display: block; font-size: 0.8em; color: #bdc3c7;">(スカウト費用割引 / クエスト報酬1.5倍)</span>
+            </button>
+            <button onclick="showTutorialSelection('hard')">
+                ハード
+                <span style="display: block; font-size: 0.8em; color: #bdc3c7;">(現在のバージョンと同じ難易度です)</span>
+            </button>
+            <button onclick="showMainMenu()" style="margin-top: 20px;">戻る</button>
+        </div>
+        <div id="tutorial-selection" class="home-menu" style="display: none;">
+            <h3>チュートリアルをプレイしますか？</h3>
+            <button onclick="startGame(true, selectedDifficulty)">チュートリアル有り</button>
+            <button onclick="startGame(false, selectedDifficulty)">チュートリアル無し</button>
+            <button onclick="backToDifficultySelection()" style="margin-top: 20px;">難易度選択に戻る</button>
         </div>
     `;
 
@@ -2601,6 +2650,66 @@ function renderStylishHomeScreen() {
     homeScreen.style.display = 'flex';
 }
 
+/**
+ * 指定された年のストーリー任務オブジェクトを取得します。
+ * イージーモードの場合、難易度を調整します。
+ * @param {number} year - 対象の年
+ * @returns {Object | undefined} 調整後のストーリー任務オブジェクト
+ */
+function getStoryQuestForYear(year) {
+    const originalQuest = STORY_QUESTS.find(sq => sq.year === year);
+    if (!originalQuest) {
+        return undefined;
+    }
+
+    // 難易度に応じてコピーを作成して返す
+    const questCopy = JSON.parse(JSON.stringify(originalQuest));
+
+    if (gameDifficulty === 'easy') {
+        const multiplier = 0.75;
+        questCopy.difficulty = Math.floor(questCopy.difficulty * multiplier);
+        questCopy.aptitudes.combat = Math.floor(questCopy.aptitudes.combat * multiplier);
+        questCopy.aptitudes.magic = Math.floor(questCopy.aptitudes.magic * multiplier);
+        questCopy.aptitudes.exploration = Math.floor(questCopy.aptitudes.exploration * multiplier);
+    }
+
+    return questCopy;
+}
+
+/**
+ * タイトル画面でチュートリアル選択を表示します。
+ * @param {string} difficulty - 'easy' または 'hard'
+ */
+function showTutorialSelection(difficulty) {
+    selectedDifficulty = difficulty; // 選択された難易度を保持
+    document.getElementById('difficulty-selection').style.display = 'none';
+    document.getElementById('tutorial-selection').style.display = 'flex';
+}
+
+/**
+ * チュートリアル選択画面から難易度選択画面に戻ります。
+ */
+function backToDifficultySelection() {
+    document.getElementById('tutorial-selection').style.display = 'none';
+    document.getElementById('difficulty-selection').style.display = 'flex';
+}
+
+
+/**
+ * タイトル画面で難易度選択を表示します。
+ */
+function showDifficultySelection() {
+    document.getElementById('main-menu').style.display = 'none';
+    document.getElementById('difficulty-selection').style.display = 'flex';
+}
+
+/**
+ * タイトル画面でメインメニューに戻ります。
+ */
+function showMainMenu() {
+    document.getElementById('difficulty-selection').style.display = 'none';
+    document.getElementById('main-menu').style.display = 'flex';
+}
 // --- 初期化 ---
 document.addEventListener('DOMContentLoaded', () => {
     // ゲーム開始はボタンクリックで行うため、ここでは何もしない
