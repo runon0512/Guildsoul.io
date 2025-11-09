@@ -428,6 +428,7 @@ function updateAllTimeRecord(adv) {
             recruitedBy: adv.recruitedBy,
             peakSkills: { ...adv.skills },
             characterColor: adv.characterColor, // ★ カラー情報を追加
+            avatar: { ...adv.avatar } // ★ アバター情報を追加
         };
     } else {
         // 既存冒険者の最高記録更新チェック
@@ -441,6 +442,7 @@ function updateAllTimeRecord(adv) {
             // 名前が変更されている可能性も考慮
             record.name = adv.name;
             record.characterColor = adv.characterColor; // ★ カラー情報を更新
+            record.avatar = { ...adv.avatar }; // ★ アバター情報を更新
         }
     }
 }
@@ -634,6 +636,9 @@ const namesFemale = [
  * @returns {number} 経験値倍率
  */
 function getAgeMultiplier(age) {
+    // ★ 年齢がnull（引継ぎ冒険者）の場合は倍率1.0を返す
+    if (age === null) return 1.0;
+
     if (age <= 17) return 1.3;
     if (age === 18) return 1.2;
     if (age === 19) return 1.1;
@@ -915,10 +920,13 @@ function renderAdventurerList() {
             const questName = questNameMatch ? questNameMatch[1] : '';
             actionButtons = `<button onclick="cancelScheduledQuest(${adv.id}, '${questName}')">予定をキャンセル</button>`;
         } else if (!isOffseason) { // オフシーズン中は操作不可
-            actionButtons = `
-                <button onclick="renameAdventurer(${adv.id})">名前変更</button>
-                <button onclick="showColorPalette(${adv.id})">カラー変更</button>
-            `;
+            // ★ 引継ぎ冒険者は名前変更不可
+            if (adv.isInherited) {
+                actionButtons = `<button onclick="showColorPalette(${adv.id})">カラー変更</button>`;
+            } else {
+                actionButtons = `<button onclick="renameAdventurer(${adv.id})">名前変更</button>
+                                 <button onclick="showColorPalette(${adv.id})">カラー変更</button>`;
+            }
         }
 
         // ★ 表示用の年俸を「月給 x 11」で再計算
@@ -929,6 +937,12 @@ function renderAdventurerList() {
         const attribute = ATTRIBUTES[adv.attribute];
         const textColor = getContrastColor(attribute?.color);
         const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};" title="${attribute.description}">${attribute.name}</span>` : 'なし';
+
+        // ★ 引継ぎ冒険者の名前スタイルを定義
+        let nameStyle = `border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;`;
+        if (adv.isInherited) {
+            nameStyle += `color: #FFD700; text-shadow: 0 0 5px #FFD700, 0 0 8px #FFD700;`;
+        }
 
         let nameCellHtml;
         if (showAvatars && adv.avatar) {
@@ -963,14 +977,14 @@ function renderAdventurerList() {
                     <img src="avatar_parts/eyes/${adv.avatar.eyes}.svg" class="avatar-part" style="${styleToString(eyesStyle)}">
                 </div>
             `;
-            nameCellHtml = `<div class="adventurer-summary">${avatarHtml} <span class="adventurer-name" style="border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;">${adv.name}</span></div>`;
+            nameCellHtml = `<div class="adventurer-summary">${avatarHtml} <span class="adventurer-name" style="${nameStyle}">${adv.name}</span></div>`;
         } else {
-            nameCellHtml = `<span class="adventurer-name" style="border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;">${adv.name}</span>`;
+            nameCellHtml = `<span class="adventurer-name" style="${nameStyle}">${adv.name}</span>`;
         }
         row.innerHTML = `
             <td>${nameCellHtml}</td>
-            <td>${adv.gender}/${adv.age}歳</td>
-            <td>${attributeHtml}</td>
+            <td>${adv.gender}/${adv.age !== null ? adv.age + '歳' : '不詳'}</td>
+            <td class="adventurer-attribute-cell">${attributeHtml}</td>
             <td>${getStyledRankHtml(adv.rank)}</td>
             <td>${adv.ovr}</td>
             <td>${getStyledSkillHtml(adv.skills.combat)}</td>
@@ -978,7 +992,7 @@ function renderAdventurerList() {
             <td>${getStyledSkillHtml(adv.skills.exploration)}</td>
             <td>${displayedAnnualSalary}</td>
             <td>
-                ${adv.exp} / ${adv.expToLevelUp}
+                ${adv.isInherited ? '---' : `${adv.exp} / ${adv.expToLevelUp}`}
                 <div class="exp-bar-container">
                     <div class="exp-bar" style="width: ${expPercentage}%;"></div>
                 </div>
@@ -1054,6 +1068,12 @@ function renameAdventurer(advId) {
     // 待機中ではない場合は名前変更できないようにする
     if (adv.status !== '待機中') {
         alert('クエスト予定中の冒険者の名前は変更できません。');
+        return;
+    }
+
+    // ★ 引継ぎ冒険者は名前変更不可
+    if (adv.isInherited) {
+        alert('引き継いだ冒険者の名前は変更できません。');
         return;
     }
 
@@ -1363,6 +1383,13 @@ function joinSelectedAdventurers(policyKey) {
     // ★ 新メンバーを最高記録に登録
     selectedAdventurers.forEach(adv => {
         updateAllTimeRecord(adv);
+
+        // ★ 引継ぎ冒M険者の場合、特別な色を設定
+        if (adv.isInherited) {
+            adv.characterColor = '#FFD700'; // 金色
+            adv.name = `👑 ${adv.name}`; // 王冠の絵文字を追加
+        }
+
     });
     
     alert(`${selectedAdventurers.length}名の冒険者をギルドに迎え入れ、合計 ${totalCost} 万Gを支払いました！`);
@@ -1747,11 +1774,16 @@ function showQuestSelection(questId, targetAdvId = null) {
         // 昇級試験の場合はチェックボックスを強制的にチェック済み・無効化
         const checked = quest.isPromotion ? 'checked disabled' : '';
 
+        // ★ 引継ぎ冒険者の名前スタイルを定義
+        let nameStyle = `border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;`;
+        if (adv.isInherited) {
+            nameStyle += `color: #FFD700; text-shadow: 0 0 5px #FFD700, 0 0 8px #FFD700;`;
+        }
 
         row.innerHTML = `
             <td><input type="checkbox" name="quest-adv-select" value="${adv.id}" ${checked}></td>
-            <td><span class="adventurer-name" style="border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;">${adv.name}</span></td>
-            <td>${getStyledRankHtml(adv.rank)}</td>
+            <td><span class="adventurer-name" style="${nameStyle}">${adv.name}</span></td>
+            <td class="adventurer-rank-cell">${getStyledRankHtml(adv.rank)}</td>
             <td>${adv.ovr}</td>
             <td>${getStyledSkillHtml(adv.skills.combat)}</td>
             <td>${getStyledSkillHtml(adv.skills.magic)}</td>
@@ -1759,7 +1791,7 @@ function showQuestSelection(questId, targetAdvId = null) {
             <td>
                 ${adv.exp} / ${adv.expToLevelUp}
                 <div class="exp-bar-container">
-                    <div class="exp-bar" style="width: ${expPercentage}%;"></div>
+                    <div class="exp-bar" style="width: ${adv.isInherited ? '0' : expPercentage}%;"></div>
                 </div>
             </td>
             <td>${adv.status}</td>
@@ -1912,7 +1944,7 @@ function updateQuestSuccessRate(quest) {
         
         if (selectedIds.includes(adv.id) && selectedAdventurers.length > 0) {
             // 選択されている冒険者の場合
-            const ageMultiplier = getAgeMultiplier(adv.age); // 年齢倍率
+            const ageMultiplier = getAgeMultiplier(adv.age); // 年齢倍率 (引継ぎ者は1.0)
             const rankMultiplier = getRankMultiplier(adv.rank); // ★ ランク倍率を追加
             const traitExpModifier = 1.0; // 旧特性システム廃止のため1.0に固定
 
@@ -1920,7 +1952,7 @@ function updateQuestSuccessRate(quest) {
             const individualExp = Math.round(gainedBaseExp * totalMultiplier * expModifier);
             
             // 倍率は小数点第二位まで表示
-            expPreviewEl.textContent = `${individualExp} P (x${totalMultiplier.toFixed(2)})`; // ★ 表示も合計倍率に
+            expPreviewEl.textContent = adv.isInherited ? '---' : `${individualExp} P (x${totalMultiplier.toFixed(2)})`; // ★ 引継ぎ者はEXP表示なし
             expPreviewEl.style.fontWeight = 'bold';
             // 倍率が1.0以上なら青、0より大きく1.0未満なら緑、0なら灰色
             expPreviewEl.style.color = (totalMultiplier >= 1.0) ? 'blue' : (totalMultiplier > 0) ? 'green' : 'gray'; 
@@ -2298,6 +2330,11 @@ function processQuestsResults(isGameOverCheckOnly = false) {
         let totalGainedExp = 0;
 
         sentAdventurers.forEach(adv => {
+            // ★ 引継ぎ冒険者は経験値もレベルアップもしない
+            if (adv.isInherited) {
+                return; // この冒険者の経験値処理をスキップ
+            }
+
             const ageMultiplier = getAgeMultiplier(adv.age); // 年齢倍率
             const rankMultiplier = getRankMultiplier(adv.rank); // ★ ランク倍率を追加
             const traitExpModifier = 1.0; // 旧特性システム廃止のため1.0に固定
@@ -2430,7 +2467,7 @@ function payMonthlySalary() {
  */
 function processAgingEffects() {
     let agingMessages = [];
-    adventurers.forEach(adv => {
+    adventurers.filter(adv => adv.age !== null).forEach(adv => { // ★ 年齢がnullでない冒険者のみ処理
         if (adv.age > 35) {
             let decreasedSkills = [];
             let totalDecrease = 0;
@@ -2544,8 +2581,46 @@ function renderHallOfFameTable(containerId) {
         const textColor = getContrastColor(attribute?.color);
         const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};" title="${attribute.description}">${attribute.name}</span>` : 'なし';
 
+        // ★ アバター表示用のHTMLを生成
+        let nameCellHtml;
+        if (record.avatar) {
+            const attributeName = ATTRIBUTES[record.attribute]?.name;
+            const baseHue = ELEMENT_HUES[attributeName] ?? null;
+            const hairHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
+            const eyesHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
+            const faceStyle = getPartStyle('face', record.avatar.face);
+            const backStyle = getPartStyle('back', record.avatar.back);
+            const earsStyle = getPartStyle('ears', record.avatar.ears);
+            const eyesStyle = getPartStyle('eyes', record.avatar.eyes);
+            const hairStyle = getPartStyle('hair', record.avatar.hair);
+            const hairFilter = baseHue !== null ? `hue-rotate(${hairHue}deg) saturate(1.5)` : 'none';
+            hairStyle.filter = hairFilter;
+            backStyle.filter = hairFilter;
+            eyesStyle.filter = baseHue !== null ? `hue-rotate(${eyesHue}deg) saturate(2)` : 'none';
+            const styleToString = (styleObj) => Object.entries(styleObj).map(([key, value]) => `${key.replace(/([A-Z])/g, '-$1').toLowerCase()}:${value}`).join(';');
+            const avatarHtml = `
+                <div class="avatar-container">
+                    <img src="avatar_parts/back/${record.avatar.back}.svg" class="avatar-part" style="${styleToString(backStyle)}">
+                    <img src="avatar_parts/face/${record.avatar.face}.svg" class="avatar-part" style="${styleToString(faceStyle)}">
+                    <img src="avatar_parts/ears/${record.avatar.ears}.svg" class="avatar-part" style="${styleToString(earsStyle)}">
+                    <img src="avatar_parts/hair/${record.avatar.hair}.svg" class="avatar-part" style="${styleToString(hairStyle)}">
+                    <img src="avatar_parts/eyes/${record.avatar.eyes}.svg" class="avatar-part" style="${styleToString(eyesStyle)}">
+                </div>`;
+            nameCellHtml = `<div class="adventurer-summary">${avatarHtml} <span class="adventurer-name" style="border-bottom: 3px solid ${record.characterColor || '#ccc'}; padding-bottom: 2px;">${record.name}</span></div>`;
+        } else {
+            nameCellHtml = `<span class="adventurer-name" style="border-bottom: 3px solid ${record.characterColor || '#ccc'}; padding-bottom: 2px;">${record.name}</span>`;
+        }
+
+        // ★ 引き継いだ冒険者は殿堂入りできないようにする
+        let inductButtonHtml = '';
+        if (!record.isInherited) {
+            inductButtonHtml = `<button id="induct-btn-${record.id}" onclick="inductToHallOfFame(${record.id})">殿堂入り</button>`;
+        } else {
+            inductButtonHtml = '<span>(引継ぎ)</span>';
+        }
+
         row.innerHTML = `
-            <td><span class="adventurer-name" style="border-bottom: 3px solid ${record.characterColor || '#ccc'}; padding-bottom: 2px;">${record.name}</span></td>
+            <td>${nameCellHtml}</td>
             <td>${record.gender}</td><td>${attributeHtml}</td><td>${getStyledRankHtml(record.peakRank)}</td>
             <td>${record.peakOvr}</td>
             <td>${record.peakSkills.combat}</td>
@@ -2553,7 +2628,7 @@ function renderHallOfFameTable(containerId) {
             <td>${record.peakSkills.exploration}</td>
             <td>${record.peakAge}歳</td>
             <td>${SCOUT_POLICIES[record.recruitedBy]?.name || '不明'}</td>
-            <td><button id="induct-btn-${record.id}" onclick="inductToHallOfFame(${record.id})">殿堂入り</button></td>
+            <td>${inductButtonHtml}</td>
         `;
     });
 
@@ -2579,8 +2654,10 @@ function inductToHallOfFame(advId) {
 
     // ボタンを無効化してフィードバック
     const button = document.getElementById(`induct-btn-${advId}`);
-    button.textContent = '殿堂入り済';
-    button.disabled = true;
+    if (button) {
+        button.textContent = '殿堂入り済';
+        button.disabled = true;
+    }
     alert(`「${recordToInduct.name}」をギルドの殿堂に登録しました。`);
 }
 
@@ -2706,11 +2783,12 @@ function showTutorialStep(step) {
  * @param {boolean} withTutorial - チュートリアルを実行するかどうか
  * @param {string} difficulty - 'easy' または 'hard'
  * ※ この関数はホーム画面の最終選択から呼び出される
+ * @param {Object|null} inheritedAdventurer - 引き継ぐ冒険者データ
  */
-function startGame(withTutorial, difficulty) {
+function startGame(withTutorial, difficulty, inheritedAdventurer = null) {
     const homeScreen = document.getElementById('home-screen');
     const gameContainer = document.getElementById('game-container');
-    gameDifficulty = selectedDifficulty; // ★ ホーム画面で選択された難易度を反映
+    gameDifficulty = difficulty; // ★ 引数から難易度を反映
     if (homeScreen) homeScreen.style.display = 'none'; // ホーム画面全体を非表示に
     if (gameContainer) gameContainer.style.display = 'block';
 
@@ -2725,6 +2803,29 @@ function startGame(withTutorial, difficulty) {
     currentYear = 1;
     allTimeAdventurers = {};
 
+    // ★ 引継ぎ冒険者がいる場合の処理
+    if (inheritedAdventurer) {
+        // 新しいIDを割り振り、ランクをGにリセット
+        const newAdv = { ...inheritedAdventurer }; // スプレッド構文で基本情報をコピー
+        newAdv.skills = { ...inheritedAdventurer.peakSkills }; // peakSkillsをskillsにコピー
+        // ★ OVRをスキル値から再計算
+        newAdv.ovr = newAdv.skills.combat + newAdv.skills.magic + newAdv.skills.exploration;
+        newAdv.age = null; // ★ 年齢をnullに設定
+        newAdv.id = nextAdventurerId++;
+        newAdv.rank = 'G';
+        newAdv.status = '待機中';
+        newAdv.exp = 0;
+        newAdv.expToLevelUp = 100;
+        newAdv.isInherited = true; // 引継ぎフラグ
+        newAdv.characterColor = '#FFD700'; // 名前を金色に
+        newAdv.name = `👑 ${newAdv.name}`;
+        // ★ OVRとGランクを基に年俸を再計算
+        newAdv.annualSalary = calculateAnnualSalary(newAdv.ovr, newAdv.rank);
+
+        adventurers.push(newAdv);
+        updateAllTimeRecord(newAdv); // 新しいゲームの殿堂にも記録
+    }
+
     // ゲームの初期表示を更新
     updateAutoAssignButtonVisibility();
     updateDisplay();
@@ -2732,7 +2833,7 @@ function startGame(withTutorial, difficulty) {
     // ログ表示を隠す
     if (lastMonthLogEl) {
         lastMonthLogEl.style.display = 'none';
-    }
+    }    
 
     if (withTutorial) {
         startTutorial();
@@ -2775,6 +2876,12 @@ function removeFromHallOfFame(advId) {
         localStorage.setItem('guildSoulHallOfFame', JSON.stringify(pastRecords));
         alert(`「${recordToRemove.name}」の記録を削除しました。`);
 
+        // ★ 引継ぎ選択画面が表示されている場合は、そちらも更新する
+        const inheritanceModal = document.getElementById('inheritance-selection');
+        if (inheritanceModal && inheritanceModal.style.display === 'flex') {
+            showInheritanceSelection(selectedDifficulty, isInTutorial);
+        }
+
         // 表示を再描画
         showPastRecords();
     }
@@ -2809,13 +2916,47 @@ function renderHallOfFame(records, containerId) {
         const textColor = getContrastColor(attribute?.color);
         const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};" title="${attribute.description}">${attribute.name}</span>` : 'なし';
 
+        // ★ アバター表示用のHTMLを生成
+        let nameCellHtml;
+        if (record.avatar) {
+            const attributeName = ATTRIBUTES[record.attribute]?.name;
+            const baseHue = ELEMENT_HUES[attributeName] ?? null;
+            const hairHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
+            const eyesHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
+            const faceStyle = getPartStyle('face', record.avatar.face);
+            const backStyle = getPartStyle('back', record.avatar.back);
+            const earsStyle = getPartStyle('ears', record.avatar.ears);
+            const eyesStyle = getPartStyle('eyes', record.avatar.eyes);
+            const hairStyle = getPartStyle('hair', record.avatar.hair);
+            const hairFilter = baseHue !== null ? `hue-rotate(${hairHue}deg) saturate(1.5)` : 'none';
+            hairStyle.filter = hairFilter;
+            backStyle.filter = hairFilter;
+            eyesStyle.filter = baseHue !== null ? `hue-rotate(${eyesHue}deg) saturate(2)` : 'none';
+            const styleToString = (styleObj) => Object.entries(styleObj).map(([key, value]) => `${key.replace(/([A-Z])/g, '-$1').toLowerCase()}:${value}`).join(';');
+            const avatarHtml = `
+                <div class="avatar-container">
+                    <img src="avatar_parts/back/${record.avatar.back}.svg" class="avatar-part" style="${styleToString(backStyle)}">
+                    <img src="avatar_parts/face/${record.avatar.face}.svg" class="avatar-part" style="${styleToString(faceStyle)}">
+                    <img src="avatar_parts/ears/${record.avatar.ears}.svg" class="avatar-part" style="${styleToString(earsStyle)}">
+                    <img src="avatar_parts/hair/${record.avatar.hair}.svg" class="avatar-part" style="${styleToString(hairStyle)}">
+                    <img src="avatar_parts/eyes/${record.avatar.eyes}.svg" class="avatar-part" style="${styleToString(eyesStyle)}">
+                </div>`;
+            nameCellHtml = `<div class="adventurer-summary">${avatarHtml} <span class="adventurer-name" style="border-bottom: 3px solid ${record.characterColor || '#ccc'}; padding-bottom: 2px;">${record.name}</span></div>`;
+        } else {
+            nameCellHtml = `<span class="adventurer-name" style="border-bottom: 3px solid ${record.characterColor || '#ccc'}; padding-bottom: 2px;">${record.name}</span>`;
+        }
+
         row.innerHTML = `
-            <td><span class="adventurer-name" style="border-bottom: 3px solid ${record.characterColor || '#ccc'}; padding-bottom: 2px;">${record.name}</span></td><td>${record.gender}</td><td>${attributeHtml}</td><td>${getStyledRankHtml(record.peakRank)}</td>
+            <td>${nameCellHtml}</td><td>${record.gender}</td><td>${attributeHtml}</td><td>${getStyledRankHtml(record.peakRank)}</td>
             <td>${record.peakOvr}</td><td>${record.peakSkills.combat}</td>
             <td>${record.peakSkills.magic}</td><td>${record.peakSkills.exploration}</td>
             <td>${record.peakAge}歳</td><td>${SCOUT_POLICIES[record.recruitedBy]?.name || '不明'}</td>
             <td><button onclick="removeFromHallOfFame(${record.id})">削除</button></td>
         `;
+        // ★ 引継ぎ済みの冒険者は名前を金色にする
+        if (record.inherited) {
+            row.querySelector('.adventurer-name').style.color = '#FFD700';
+        }
     });
 
     container.appendChild(table);
@@ -3210,8 +3351,8 @@ function renderStylishHomeScreen() {
         </div>
         <div id="tutorial-selection" class="home-menu" style="display: none;">
             <h3>チュートリアルをプレイしますか？</h3>
-            <button onclick="startGame(true, selectedDifficulty)">チュートリアル有り</button>
-            <button onclick="startGame(false, selectedDifficulty)">チュートリアル無し</button>
+            <button onclick="showInheritanceSelection(selectedDifficulty, true)">チュートリアル有り</button>
+            <button onclick="showInheritanceSelection(selectedDifficulty, false)">チュートリアル無し</button>
             <button onclick="backToDifficultySelection()" style="margin-top: 20px;">難易度選択に戻る</button>
         </div>
     `;
@@ -3222,6 +3363,79 @@ function renderStylishHomeScreen() {
         gameContainer.style.display = 'none';
     }
     homeScreen.style.display = 'flex';
+}
+
+/**
+ * 冒険者引継ぎの選択画面を表示します。
+ * @param {string} difficulty - 選択された難易度
+ * @param {boolean} withTutorial - チュートリアルを実行するかどうか
+ */
+function showInheritanceSelection(difficulty, withTutorial) {
+    const homeScreen = document.getElementById('home-screen');
+    homeScreen.innerHTML = ''; // ホーム画面をクリア
+
+    const pastRecords = JSON.parse(localStorage.getItem('guildSoulHallOfFame') || '{}');
+    const inheritableAdventurers = Object.values(pastRecords); // ★ 引継ぎ済みフィルターを解除
+
+    // 引き継ぎ可能な冒険者がいない場合は、すぐにゲームを開始
+    if (inheritableAdventurers.length === 0) {
+        startGame(withTutorial, difficulty, null);
+        return;
+    }
+
+    const container = document.createElement('div');
+    container.id = 'inheritance-selection';
+    container.className = 'home-menu'; // 既存のスタイルを流用
+    container.style.display = 'flex';
+
+    let content = `
+        <h2>冒険者の引継ぎ</h2>
+        <p>殿堂入りした冒険者を一人だけ、新しいゲームに連れて行くことができます。<br>（スキルと属性はそのまま、ランクはGから再スタートします）</p>
+        <div class="hall-of-fame-container" style="max-height: 40vh; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
+            <table>
+                <thead>
+                    <tr><th>名前</th><th>属性</th><th>最高ランク</th><th>最高OVR</th><th>操作</th></tr>
+                </thead>
+                <tbody>
+    `;
+
+    inheritableAdventurers.sort((a, b) => b.peakOvr - a.peakOvr).forEach(record => {
+        const attribute = ATTRIBUTES[record.attribute];
+        const textColor = getContrastColor(attribute?.color);
+        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};">${attribute.name}</span>` : 'なし';
+
+        content += `
+            <tr>
+                <td>${record.name}</td>
+                <td>${attributeHtml}</td>
+                <td>${getStyledRankHtml(record.peakRank)}</td>
+                <td>${record.peakOvr}</td>
+                <td><button onclick='confirmInheritance(${JSON.stringify(record)}, "${difficulty}", ${withTutorial})'>この冒険者を引き継ぐ</button></td>
+            </tr>
+        `;
+    });
+
+    content += `
+                </tbody>
+            </table>
+        </div>
+        <button onclick='startGame(${withTutorial}, "${difficulty}", null)' style="margin-top: 20px; border-color: #e74c3c;">引き継がないで始める</button>
+    `;
+
+    container.innerHTML = content;
+    homeScreen.appendChild(container);
+}
+
+/**
+ * 引継ぎの最終確認を行い、ゲームを開始します。
+ * @param {Object} adventurerRecord - 引き継ぐ冒険者の記録
+ * @param {string} difficulty - 難易度
+ * @param {boolean} withTutorial - チュートリアルの有無
+ */
+function confirmInheritance(adventurerRecord, difficulty, withTutorial) {
+    if (confirm(`「${adventurerRecord.name}」をギルドの初期メンバーとして引き継ぎますか？`)) {
+        startGame(withTutorial, difficulty, adventurerRecord);
+    }
 }
 
 /**
