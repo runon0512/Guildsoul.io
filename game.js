@@ -173,8 +173,8 @@ const AVATAR_PART_CONFIG = {
     // 各パーツのデフォルトスタイル
     defaults: {
         back: { top: '-60%', left: '-48%', width: '200%', zIndex: 5 }, // 後ろ髪のスタイルを追加
-        face: { top: '5%', left: '7.5%', width: '90%', zIndex: 10 },
-        ears: { top: '27%', left: '-5.15%', width: '108%', zIndex: 20 },
+        face: { top: '5%', left: '7.5%', width: '90%', zIndex: 20 },
+        ears: { top: '27%', left: '-5.15%', width: '108%', zIndex: 10 },
         eyes: { top: '31.5%', left: '14.28%', width: '72%', zIndex: 30 },
         hair: { top: '-20.7%', left: '5%', width: '96.5%', zIndex: 40 }, // 前髪
     },
