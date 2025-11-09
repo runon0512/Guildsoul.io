@@ -114,7 +114,82 @@ function getContrastColor(hexColor) {
     return (yiq >= 128) ? '#000000' : '#ffffff';
 }
 
+// --- アバター関連の定義 ---
+// アバターパーツの定義
+// total: 全ファイル数
+// female_end: 女性用パーツの最後の番号 (1からこの番号までが女性用)
+const AVATAR_PART_DEFINITIONS = {
+    face: { total: 2, female_end: 1 }, // 1が女性、(1+1)以降が男性
+    hair: { total: 11, female_end: 9 }, // 1-4が女性、5-8が男性
+    back: { total: 6, female_end: 5 }, // 1-3が女性、4-5が男性
+    eyes: { total: 4, female_end: 3 }, // 1-2が女性、3が男性
+    ears: { total: 3, female_end: 3 }, // 1-2が女性、3が男性
+};
 
+/**
+ * 性別に基づいてアバターパーツのファイル名を選択する
+ * @param {string} partType - 'face', 'hair'などのパーツ種別
+ * @param {string} gender - '女性' または '男性'
+ * @returns {string} ファイル名 (例: 'hair-5')
+ */
+function selectAvatarPart(partType, gender) {
+    const def = AVATAR_PART_DEFINITIONS[partType];
+    if (!def) return `${partType}-1`; // 定義がなければデフォルト
+
+    let start, count;
+    if (gender === '女性') {
+        start = 1;
+        count = def.female_end;
+    } else { // 男性
+        start = def.female_end + 1;
+        count = def.total - def.female_end;
+    }
+
+    // もし男性用パーツが存在しない場合、女性用を流用する
+    if (count <= 0) {
+        start = 1;
+        count = def.female_end;
+    }
+
+    const partNumber = Math.floor(Math.random() * count) + start;
+    return `${partType}-${partNumber}`;
+}
+// 属性名とCSSフィルターのhue-rotateで使う基本色相（角度）をマッピング
+const ELEMENT_HUES = {
+    '炎': 0, '烈火': 0, '爆炎': 0, '太陽': 0, '終焉': 0,
+    '水': 220, '流水': 220, '渦潮': 220,
+    '氷': 180, '氷結': 180,
+    '雷': 50, '電光': 50, '轟雷': 50,
+    '風': 120, '疾風': 120, '嵐': 120,
+    '土': 40, '大地': 40, 'ガイア': 40,
+    '光': 60, '聖光': 60, '神聖': 60, '月': 240, '創生': 60, '奇跡': 330,
+    '闇': 280, '常闇': 280, '深淵': 280, '混沌': 260, '虚無': 270,
+    '岩': 30, '鋼': 210, '機': 200,
+    '毒': 300, '水晶': 300, '獣': 35, '霊': 260, '竜': 15, '幻': 280, '時': 200, '星': 230
+};
+
+// --- アバターパーツの位置と大きさの設定 ---
+const AVATAR_PART_CONFIG = {
+    // 各パーツのデフォルトスタイル
+    defaults: {
+        back: { top: '-60%', left: '-48%', width: '200%', zIndex: 5 }, // 後ろ髪のスタイルを追加
+        face: { top: '5%', left: '7.5%', width: '90%', zIndex: 10 },
+        ears: { top: '27%', left: '-5.15%', width: '108%', zIndex: 20 },
+        eyes: { top: '31.5%', left: '14.28%', width: '72%', zIndex: 30 },
+        hair: { top: '-20.7%', left: '5%', width: '96.5%', zIndex: 40 }, // 前髪
+    },
+    // 特定のファイルに対する上書きスタイル
+    overrides: {
+        // 例: 'hair-2' の位置を少し上にずらす場合
+        // 'hair-2': { top: '-15%' }, 
+    }
+};
+
+function getPartStyle(partType, partFileName) {
+    const defaultStyle = AVATAR_PART_CONFIG.defaults[partType] || {};
+    const overrideStyle = AVATAR_PART_CONFIG.overrides[partFileName] || {};
+    return { ...defaultStyle, ...overrideStyle };
+}
 
 // --- ランク定義 ---
 const RANKS = ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S', 'X', 'XG', 'XF', 'XE', 'XD', 'XC', 'XB', 'XA', 'XS', 'XX', 'V'];
@@ -434,7 +509,7 @@ function calculateBaseValue(age, baseBonus = 0) {
 }
 
 // ランダムな冒険者のデータを生成 (名前リストは省略せず全文記載)
-function generateAdventurer(baseBonus, policyKey) { 
+function generateAdventurer(policyKey) {
     // --- 新しい属性とスキルの生成ロジック ---
     // 1. 属性をレア度に基づいて決定
     const rand = Math.random();
@@ -447,9 +522,10 @@ function generateAdventurer(baseBonus, policyKey) {
     const possibleAttributes = Object.keys(ATTRIBUTES).filter(key => ATTRIBUTES[key].rarity === rarity);
     const selectedAttributeKey = possibleAttributes[Math.floor(Math.random() * possibleAttributes.length)];
 
-    // ★★★ 冒険者名の生成ロジックを修正/確定 ★★★
-    const minAge = 17; 
-    const maxAge = 60;
+    // ★★★ スカウト方針に基づいて年齢を決定 ★★★
+    const policy = SCOUT_POLICIES[policyKey];
+    const minAge = policy.minAge;
+    const maxAge = policy.maxAge;
     const age = Math.floor(Math.random() * (maxAge - minAge + 1)) + minAge;
     
     const genders = ['男性', '女性'];
@@ -499,7 +575,7 @@ const namesFemale = [
         ? namesFemale[Math.floor(Math.random() * namesFemale.length)]
         : namesMale[Math.floor(Math.random() * namesMale.length)];
 
-    const baseValue = calculateBaseValue(age, baseBonus);
+    const baseValue = calculateBaseValue(age, policy.baseBonus);
     
     let combatSkill = getRandomSkill(baseValue);
     let magicSkill = getRandomSkill(baseValue);
@@ -517,7 +593,17 @@ const namesFemale = [
     const joinCost = calculateJoinCost(ovr);
     // ★ ランクを渡すように修正
     const annualSalary = calculateAnnualSalary(ovr, 'G');
-    
+
+    // アバターパーツをランダムに選択
+    const avatar = {
+        face: selectAvatarPart('face', selectedGender),
+        hair: selectAvatarPart('hair', selectedGender),
+        back: selectAvatarPart('back', selectedGender),
+        eyes: selectAvatarPart('eyes', selectedGender),
+        ears: selectAvatarPart('ears', selectedGender)
+    };
+
+
     return {
         id: nextAdventurerId++,
         name: selectedName,
@@ -536,7 +622,8 @@ const namesFemale = [
         joinCost: joinCost,
         annualSalary: annualSalary,
         exp: 0, 
-        expToLevelUp: 100, // ★ 経験値を100に固定
+        expToLevelUp: 100,
+        avatar: avatar, // アバター情報を追加
         characterColor: '#cccccc' // ★ キャラクターカラーの初期値
     };
 }
@@ -765,6 +852,7 @@ function renderProjectionSummary(containerEl) {
 
 // --- 冒険者リストの表示 (キャンセルボタンを追加) ---
 function renderAdventurerList() {
+    const showAvatars = document.getElementById('show-avatars').checked;
     adventurerListEl.innerHTML = ''; 
 
     if (adventurers.length === 0) {
@@ -790,7 +878,8 @@ function renderAdventurerList() {
     const table = document.createElement('table');
     table.className = 'adventurer-main-table';
     table.innerHTML = `
-        <tr>
+        <thead>
+            <tr>
             <th>名前</th>
             <th>性別/年齢</th>
             <th>属性</th>
@@ -803,8 +892,10 @@ function renderAdventurerList() {
             <th>経験値 / NEXT</th>
             <th>状態</th>
             <th>操作</th>
-        </tr>
+            </tr>
+        </thead>
     `;
+    const tbody = table.createTBody();
 
     sortedAdventurers.forEach(adv => {
         const row = table.insertRow();
@@ -839,8 +930,45 @@ function renderAdventurerList() {
         const textColor = getContrastColor(attribute?.color);
         const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};" title="${attribute.description}">${attribute.name}</span>` : 'なし';
 
+        let nameCellHtml;
+        if (showAvatars && adv.avatar) {
+            const attributeName = ATTRIBUTES[adv.attribute]?.name;
+            const baseHue = ELEMENT_HUES[attributeName] ?? null;
+
+            // 色相が定義されている属性の場合のみ色を変更
+            const hairHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
+            const eyesHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
+
+            // スタイルを取得
+            const faceStyle = getPartStyle('face', adv.avatar.face);
+            const backStyle = getPartStyle('back', adv.avatar.back);
+            const earsStyle = getPartStyle('ears', adv.avatar.ears);
+            const eyesStyle = getPartStyle('eyes', adv.avatar.eyes);
+            const hairStyle = getPartStyle('hair', adv.avatar.hair);
+
+            // フィルタースタイルを動的に追加
+            const hairFilter = baseHue !== null ? `hue-rotate(${hairHue}deg) saturate(1.5)` : 'none';
+            hairStyle.filter = hairFilter;
+            backStyle.filter = hairFilter; // 後ろ髪にも同じフィルターを適用
+            eyesStyle.filter = baseHue !== null ? `hue-rotate(${eyesHue}deg) saturate(2)` : 'none';
+
+            // style属性を生成する関数
+            const styleToString = (styleObj) => Object.entries(styleObj).map(([key, value]) => `${key.replace(/([A-Z])/g, '-$1').toLowerCase()}:${value}`).join(';');
+            const avatarHtml = `
+                <div class="avatar-container">
+                    <img src="avatar_parts/back/${adv.avatar.back}.svg" class="avatar-part" style="${styleToString(backStyle)}">
+                    <img src="avatar_parts/face/${adv.avatar.face}.svg" class="avatar-part" style="${styleToString(faceStyle)}">
+                    <img src="avatar_parts/ears/${adv.avatar.ears}.svg" class="avatar-part" style="${styleToString(earsStyle)}">
+                    <img src="avatar_parts/hair/${adv.avatar.hair}.svg" class="avatar-part" style="${styleToString(hairStyle)}">
+                    <img src="avatar_parts/eyes/${adv.avatar.eyes}.svg" class="avatar-part" style="${styleToString(eyesStyle)}">
+                </div>
+            `;
+            nameCellHtml = `<div class="adventurer-summary">${avatarHtml} <span class="adventurer-name" style="border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;">${adv.name}</span></div>`;
+        } else {
+            nameCellHtml = `<span class="adventurer-name" style="border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;">${adv.name}</span>`;
+        }
         row.innerHTML = `
-            <td><span class="adventurer-name" style="border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;">${adv.name}</span></td>
+            <td>${nameCellHtml}</td>
             <td>${adv.gender}/${adv.age}歳</td>
             <td>${attributeHtml}</td>
             <td>${getStyledRankHtml(adv.rank)}</td>
@@ -1070,11 +1198,8 @@ function scoutAdventurers(policyKey) {
     let attempts = 0;
     
     while (scoutCandidates.length < policy.limit && attempts < MAX_ATTEMPTS) { 
-        const newAdventurer = generateAdventurer(policy.baseBonus, policyKey); 
-        
-        if (newAdventurer.age >= policy.minAge && newAdventurer.age <= policy.maxAge) {
-             scoutCandidates.push(newAdventurer);
-        }
+        const newAdventurer = generateAdventurer(policyKey);
+        scoutCandidates.push(newAdventurer);
         attempts++;
     }
 
