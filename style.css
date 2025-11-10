@@ -43,10 +43,13 @@ body {
 
 h2 {
     color: #34495e;
-    border-bottom: 2px solid #ecf0f1;
+    border-bottom: 2px solid #34495e;
     padding-bottom: 5px;
     margin-top: 25px;
 }
+
+
+
 
 /* チュートリアルでハイライトする要素の基本スタイル */
 .tutorial-highlight {
@@ -346,7 +349,7 @@ h2 {
     text-align: center;
 }
 
-.modal-content h3 {
+h3 {
     margin-top: 0;
     color: #34495e;
 }
