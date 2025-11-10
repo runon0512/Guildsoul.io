@@ -921,7 +921,7 @@ function renderAdventurerList() {
         // ★★★ 状態の変更: クエスト予定 ★★★
         const isScheduled = adv.status.startsWith('クエスト予定');
         if (isScheduled) {
-             row.classList.add('in-quest'); 
+             row.classList.add('in-quest');
         }
         
         const expPercentage = Math.min(100, (adv.exp / adv.expToLevelUp) * 100);
@@ -930,8 +930,9 @@ function renderAdventurerList() {
         let actionButtons = '';
         if (isScheduled) {
             const questNameMatch = adv.status.match(/クエスト予定: (.+)/);
-            const questName = questNameMatch ? questNameMatch[1] : '';
-            actionButtons = `<button onclick="cancelScheduledQuest(${adv.id}, '${questName}')">予定をキャンセル</button>`;
+            // ★ 成功率表示に対応するため、クエスト名のみを抽出する
+            const fullQuestName = questNameMatch ? questNameMatch[1] : '';
+            actionButtons = `<button onclick="cancelScheduledQuest(${adv.id}, '${fullQuestName}')">予定をキャンセル</button>`;
         } else if (adv.status === '待機中' && !isOffseason && currentMonth !== 12) { // 待機中でオフシーズンでなく、かつ12月でない場合
             // 昇級試験ボタン
             if (adv.rank !== 'V') {
@@ -1053,6 +1054,8 @@ function renderAdventurerList() {
  * @param {string} questName - クエスト名
  */
 function cancelScheduledQuest(advId, questName) {
+    // ★ 成功率表示 `(xx%)` が含まれている可能性があるため、それを取り除く
+    const cleanQuestName = questName.replace(/\s*\(\d+%\)$/, '');
     const adv = adventurers.find(a => a.id == advId);
     if (!adv || !adv.status.startsWith('クエスト予定')) return;
 
@@ -1060,7 +1063,7 @@ function cancelScheduledQuest(advId, questName) {
     adv.status = '待機中';
 
     // 2. 進行中リストからこの冒険者を削除
-    const qDataIndex = questsInProgress.findIndex(q => q.quest.name === questName);
+    const qDataIndex = questsInProgress.findIndex(q => q.quest.name === cleanQuestName);
     
     if (qDataIndex !== -1) {
         const qData = questsInProgress[qDataIndex];
@@ -1085,7 +1088,7 @@ function cancelScheduledQuest(advId, questName) {
         }
     }
     
-    alert(`${adv.name} の【${questName}】の派遣予定をキャンセルしました。`);
+    alert(`${adv.name} の【${cleanQuestName}】の派遣予定をキャンセルしました。`);
     updateDisplay();
 }
 
@@ -1563,147 +1566,10 @@ function renderQuests() {
         return;
     }
 
-    // --- レイアウトコンテナを作成 ---
+    // --- メインのレイアウトコンテナを作成 ---
     const questLayoutContainer = document.createElement('div');
     questLayoutContainer.className = 'quest-layout-container';
-
-    const topRowContainer = document.createElement('div');
-    topRowContainer.className = 'quest-top-row';
-
-    const promotionColumn = document.createElement('div');
-    promotionColumn.className = 'quest-column promotion-column';
-    promotionColumn.innerHTML = '<h2>🎓 昇級試験</h2>';
-
-    const trainingColumn = document.createElement('div');
-    trainingColumn.className = 'quest-column training-column';
-    trainingColumn.innerHTML = '<h2>✨ 特別訓練</h2>';
-
-    topRowContainer.appendChild(promotionColumn);
-    topRowContainer.appendChild(trainingColumn);
-    questLayoutContainer.appendChild(topRowContainer);
     questsEl.appendChild(questLayoutContainer);
-
-    let hasAvailableQuest = false;
-
-    // --- 昇級試験クエストの生成とソート ---
-    const promotionExams = [];
-    adventurers.forEach(adv => {
-        if (adv.status === '待機中' && adv.rank !== 'V') {
-            const currentRankIndex = RANKS.indexOf(adv.rank);
-            const nextRank = RANKS[currentRankIndex + 1];
-            const requiredDifficulty = PROMOTION_DIFFICULTIES[adv.rank];
-            
-            const promotionQuest = {
-                id: 1000 + adv.id,
-                name: `${adv.name} の昇級試験 (${adv.rank} → ${nextRank})`,
-                reward: 0,
-                difficulty: requiredDifficulty,
-                aptitudes: { combat: '無関係', magic: '無関係', exploration: '無関係' }, 
-                isPromotion: true,
-                adv: adv, // 冒険者オブジェクトを保持
-                nextRank: nextRank // ★ 昇級後のランクを保持
-            };
-            // 合格率を計算して追加
-            promotionQuest.estimatedRate = calculateSuccessRate(promotionQuest, [adv]);
-            promotionExams.push(promotionQuest);
-        }
-    });
-
-    // 合格確率の高い順にソート。確率が同じ場合は難易度が高い順にソート。
-    promotionExams.sort((a, b) => {
-        // 最初に合格率で比較（降順）
-        if (b.estimatedRate !== a.estimatedRate) {
-            return b.estimatedRate - a.estimatedRate;
-        }
-        // 合格率が同じなら、難易度で比較（降順）
-        return b.difficulty - a.difficulty;
-    });
-
-    // --- ソートされた昇級試験の表示 ---
-    if (promotionExams.length > 0) {
-        promotionExams.forEach(pQuest => {
-            const adv = pQuest.adv;
-            if (adv) {
-                const questDiv = document.createElement('div');
-                questDiv.className = 'quest-item promotion-exam';
-                const statusColor = pQuest.estimatedRate >= 0.7 ? 'green' : (pQuest.estimatedRate >= 0.5 ? 'orange' : 'red');
-
-                questDiv.innerHTML = `
-                    <h3>🎓 昇級試験: ${pQuest.name}</h3>
-                    <p><strong>目標OVR:</strong> ${pQuest.difficulty} / **${adv.name} のOVR: ${adv.ovr}**</p>
-                    <p><strong>成功率目安:</strong> <span style="font-weight:bold; color:${statusColor};">${Math.round(pQuest.estimatedRate * 100)}%</span></p>
-                    <p style="font-size:0.9em;">※この任務は**${adv.name}単独**で挑みます。成功すると${pQuest.nextRank}ランクに昇級します。</p>
-                    <button onclick="showQuestSelection(${pQuest.id}, ${adv.id})">
-                        試験を受ける
-                    </button>
-                `;
-                promotionColumn.appendChild(questDiv);
-                hasAvailableQuest = true;
-            }
-        });
-    } else {
-        promotionColumn.innerHTML += '<p>現在、受験可能な冒険者はいません。</p>';
-    }
-
-    // --- 特別訓練クエストの生成と表示 ---
-    const trainingQuests = [];
-    adventurers.forEach(adv => {
-        const attribute = ATTRIBUTES[adv.attribute];
-        if (adv.status === '待機中' && !adv.isInherited && attribute && attribute.rarity !== 'Epic') {
-            // ★★★ 動的に次の属性を生成するロジックに変更 ★★★
-            const nextRarityMap = { 'Common': 'Uncommon', 'Uncommon': 'Rare', 'Rare': 'Epic' };
-            const nextRarity = nextRarityMap[attribute.rarity];
-            if (nextRarity) {
-                // ★★★ 属性レアリティに基づいて難易度を設定 ★★★
-                let trainingDifficulty;
-                switch (attribute.rarity) {
-                    case 'Common':   trainingDifficulty = 120; break;
-                    case 'Uncommon': trainingDifficulty = 150; break;
-                    case 'Rare':     trainingDifficulty = 200; break;
-                    default:         trainingDifficulty = 120; // フォールバック
-                }
-                // ★★★ 修正ここまで ★★★
-
-                const nextName = attribute.name + '+';
-                const trainingQuest = {
-                    id: 3000 + adv.id,
-                    name: `属性強化訓練 (${attribute.name} → ${nextName})`,
-                    difficulty: trainingDifficulty,
-                    aptitudes: { combat: '無関係', magic: '無関係', exploration: '無関係' },
-                    isTraining: true,
-                    adv: adv,
-                };
-                trainingQuest.estimatedRate = calculateSuccessRate(trainingQuest, [adv]);
-                trainingQuests.push(trainingQuest);
-            }
-        }
-    });
-
-    trainingQuests.sort((a, b) => b.estimatedRate - a.estimatedRate);
-
-    if (trainingQuests.length > 0) {
-        trainingQuests.forEach(tQuest => {
-            const adv = tQuest.adv;
-            const currentAttribute = ATTRIBUTES[adv.attribute];
-            const nextRarityMap = { 'Common': 'Uncommon', 'Uncommon': 'Rare', 'Rare': 'Epic' };
-            const nextRarity = nextRarityMap[currentAttribute.rarity];
-            const questDiv = document.createElement('div');
-            questDiv.className = 'quest-item training-quest';
-            const statusColor = tQuest.estimatedRate >= 0.7 ? 'green' : (tQuest.estimatedRate >= 0.5 ? 'orange' : 'red');
-
-            questDiv.innerHTML = `
-                <h3>✨ ${tQuest.name}</h3>
-                <p><strong>目標OVR:</strong> ${tQuest.difficulty} / <strong>${adv.name} のOVR: ${adv.ovr}</strong></p>
-                <p><strong>成功率目安:</strong> <span style="font-weight:bold; color:${statusColor};">${Math.round(tQuest.estimatedRate * 100)}%</span></p>
-                <p style="font-size:0.9em;">成功すると属性が <span class="rarity-${nextRarity.toLowerCase()}">${currentAttribute.name}+</span> に進化します。</p>
-                <button onclick="showQuestSelection(${tQuest.id}, ${adv.id})">訓練を受ける</button>
-            `;
-            trainingColumn.appendChild(questDiv);
-            hasAvailableQuest = true;
-        });
-    } else {
-        trainingColumn.innerHTML += '<p>現在、訓練可能な冒険者はいません。</p>';
-    }
 
     // --- 通常クエストの表示 ---
     const regularQuestColumn = document.createElement('div');
@@ -1711,6 +1577,7 @@ function renderQuests() {
     regularQuestColumn.innerHTML = '<h2>📜 任務</h2>';
     questLayoutContainer.appendChild(regularQuestColumn);
 
+    let hasAvailableQuest = false;
     const displayableQuests = quests.filter(quest => {
         if (quest.requiredRank) {
             const requiredRankIndex = RANKS.indexOf(quest.requiredRank);
@@ -1758,6 +1625,37 @@ function renderQuests() {
     } else {
         regularQuestColumn.innerHTML += '<p>現在、他に利用可能なクエストはありません。</p>';
     }
+
+    // --- 説明用のセクションを追加 ---
+    const bottomRowContainer = document.createElement('div');
+    bottomRowContainer.className = 'quest-top-row'; // 既存のスタイルを流用
+    bottomRowContainer.style.marginTop = '20px'; // 上にマージンを追加
+
+    // 昇級試験の説明
+    const promotionColumn = document.createElement('div');
+    promotionColumn.className = 'quest-column promotion-column';
+    promotionColumn.innerHTML = `
+        <h2>🎓 昇級試験について</h2>
+        <p style="font-size: 0.9em;">冒険者のOVRが一定値に達すると、より高いランクへの昇級試験に挑戦できます。<br>
+        試験は単独で挑み、成功するとランクが上がり、より高難易度の任務に挑戦できるようになります。<br>
+        挑戦可能な冒険者は、冒険者リストの「操作」欄から直接試験に派遣できます。<br>
+        ※昇級するにつれ、必要な給料も高くなります。</p>
+    `;
+
+    // 特別訓練の説明
+    const trainingColumn = document.createElement('div');
+    trainingColumn.className = 'quest-column training-column';
+    trainingColumn.innerHTML = `
+        <h2>✨ 特別訓練について</h2>
+        <p style="font-size: 0.9em;">冒険者のOVRが一定値に達すると、自身の属性を強化する特別訓練に挑戦できます。<br>
+        訓練は単独で挑み、成功すると属性のレアリティが上昇し、レベルアップ時のボーナスが強化されます。<br>
+        挑戦可能な冒険者は、冒険者リストの「操作」欄から直接訓練に派遣できます。<br>
+        ※費用は掛かりません</p>
+    `;
+
+    bottomRowContainer.appendChild(promotionColumn);
+    bottomRowContainer.appendChild(trainingColumn);
+    questLayoutContainer.appendChild(bottomRowContainer);
 }
 
 
@@ -2049,7 +1947,8 @@ function sendAdventurersToQuestInternal(quest, sentAdventurers) {
         if (originalQuest) originalQuest.available = false;
     }
     const successRate = calculateSuccessRate(quest, sentAdventurers);
-    sentAdventurers.forEach(adv => adv.status = `クエスト予定: ${quest.name}`);
+    const ratePercentage = Math.round(successRate * 100);
+    sentAdventurers.forEach(adv => adv.status = `クエスト予定: ${quest.name} (${ratePercentage}%)`);
     questsInProgress.push({
         quest: quest,
         adventurers: sentAdventurers,
