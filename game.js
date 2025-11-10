@@ -428,7 +428,8 @@ function updateAllTimeRecord(adv) {
             recruitedBy: adv.recruitedBy,
             peakSkills: { ...adv.skills },
             characterColor: adv.characterColor, // ★ カラー情報を追加
-            avatar: { ...adv.avatar } // ★ アバター情報を追加
+            avatar: { ...adv.avatar }, // ★ アバター情報を追加
+            isInherited: adv.isInherited || false // ★ 引継ぎフラグを保存
         };
     } else {
         // 既存冒険者の最高記録更新チェック
@@ -443,6 +444,7 @@ function updateAllTimeRecord(adv) {
             record.name = adv.name;
             record.characterColor = adv.characterColor; // ★ カラー情報を更新
             record.avatar = { ...adv.avatar }; // ★ アバター情報を更新
+            record.isInherited = adv.isInherited || record.isInherited || false; // ★ 引継ぎフラグを更新
         }
     }
 }
@@ -783,6 +785,20 @@ function updateDisplay() {
     scoutSkillEl.textContent = scoutSkill;
     updateScoutButtonCosts(); // ★ スカウトボタンのコスト表示を更新
     renderAdventurerList();
+
+    // --- 収支予測の表示 ---
+    // コンテナがなければ作成してscout-sectionに追加する
+    let projectionContainer = document.getElementById('projection-summary-container');
+    if (!projectionContainer) {
+        projectionContainer = document.createElement('div');
+        projectionContainer.id = 'projection-summary-container';
+        projectionContainer.className = 'projection-summary-panel'; // スタイルを適用
+        const scoutSection = document.getElementById('scout-section');
+        if (scoutSection) {
+            scoutSection.appendChild(projectionContainer);
+        }
+    }
+    renderProjectionSummary(projectionContainer);
     renderQuests();
 }
 
@@ -818,6 +834,7 @@ function updateAutoAssignButtonVisibility() {
  * @param {HTMLElement} containerEl - 描画先のコンテナ要素
  */
 function renderProjectionSummary(containerEl) {
+    if (!containerEl) return; // ★ コンテナがない場合は何もしない
     if (questsInProgress.length === 0) {
         containerEl.style.display = 'none';
         return;
@@ -828,7 +845,7 @@ function renderProjectionSummary(containerEl) {
 
     // 1. 派遣予定のクエストからの収入を計算
     questsInProgress.forEach(qData => {
-        if (!qData.quest.isPromotion && !qData.quest.isStory) {
+        if (!qData.quest.isPromotion && !qData.quest.isStory && !qData.quest.isTraining) {
             projectedIncome += getQuestReward(qData.quest);
         }
     });
@@ -875,10 +892,6 @@ function renderAdventurerList() {
     const tableContainer = document.createElement('div');
     tableContainer.className = 'adventurer-table-container';
 
-    const projectionContainer = document.createElement('div');
-    projectionContainer.id = 'adventurer-list-projection';
-    projectionContainer.className = 'projection-summary-panel';
-
     // --- 冒険者テーブルの作成 ---
     const table = document.createElement('table');
     table.className = 'adventurer-main-table';
@@ -919,14 +932,30 @@ function renderAdventurerList() {
             const questNameMatch = adv.status.match(/クエスト予定: (.+)/);
             const questName = questNameMatch ? questNameMatch[1] : '';
             actionButtons = `<button onclick="cancelScheduledQuest(${adv.id}, '${questName}')">予定をキャンセル</button>`;
-        } else if (!isOffseason) { // オフシーズン中は操作不可
-            // ★ 引継ぎ冒険者は名前変更不可
-            if (adv.isInherited) {
-                actionButtons = `<button onclick="showColorPalette(${adv.id})">カラー変更</button>`;
-            } else {
-                actionButtons = `<button onclick="renameAdventurer(${adv.id})">名前変更</button>
-                                 <button onclick="showColorPalette(${adv.id})">カラー変更</button>`;
+        } else if (adv.status === '待機中' && !isOffseason) { // 待機中でオフシーズンでない場合
+            // 昇級試験ボタン
+            if (adv.rank !== 'V') {
+                actionButtons += `<button class="action-btn-promotion" onclick="startPromotionExam(${adv.id})">昇級試験</button>`;
             }
+            // 特別訓練ボタン
+            const attribute = ATTRIBUTES[adv.attribute];
+            if (!adv.isInherited && attribute && attribute.rarity !== 'Epic') {
+                actionButtons += `<button class="action-btn-training" onclick="startSpecialTraining(${adv.id})">特別訓練</button>`;
+            }
+            // おすすめ任務ボタン
+            actionButtons += `<button class="action-btn-recommend" onclick="assignRecommendedQuest(${adv.id})">おすすめ任務</button>`;
+
+            // 名前変更とカラー変更ボタン
+            actionButtons += `<div style="margin-top: 5px;">`;
+            if (!adv.isInherited) { // 引継ぎ冒険者は名前変更不可
+                actionButtons += `<button onclick="renameAdventurer(${adv.id})">名前変更</button>`;
+            }
+            actionButtons += `<button onclick="showColorPalette(${adv.id})">カラー変更</button>`;
+            actionButtons += `</div>`;
+
+        } else if (!isOffseason) { // その他の状態（待機中でもオフシーズンでもない）
+            // カラー変更のみ可能など、将来的な拡張のために残す
+            actionButton = `<button onclick="showColorPalette(${adv.id})">カラー変更</button>`;
         }
 
         // ★ 表示用の年俸を「月給 x 11」で再計算
@@ -936,7 +965,16 @@ function renderAdventurerList() {
         // 属性とスキルの表示
         const attribute = ATTRIBUTES[adv.attribute];
         const textColor = getContrastColor(attribute?.color);
-        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};" title="${attribute.description}">${attribute.name}</span>` : 'なし';
+        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor}; cursor: pointer;" onclick="showAttributeDetails('${adv.attribute}')">${attribute.name}</span>` : 'なし';
+
+        // ★ 引継ぎ冒険者か、属性レアリティに基づいて行の背景クラスを追加
+        if (adv.isInherited) {
+            row.classList.add('rarity-bg-inherited');
+        } else if (attribute) {
+            const rarityClass = `rarity-bg-${attribute.rarity.toLowerCase()}`;
+            row.classList.add(rarityClass);
+        }
+
 
         // ★ 引継ぎ冒険者の名前スタイルを定義
         let nameStyle = `border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;`;
@@ -946,8 +984,9 @@ function renderAdventurerList() {
 
         let nameCellHtml;
         if (showAvatars && adv.avatar) {
-            const attributeName = ATTRIBUTES[adv.attribute]?.name;
-            const baseHue = ELEMENT_HUES[attributeName] ?? null;
+            // ★ '+'付きの属性でも元の名前で色を取得する
+            const originalAttributeName = ATTRIBUTES[adv.attribute]?.name.replace('+', '');
+            const baseHue = ELEMENT_HUES[originalAttributeName] ?? null;
 
             // 色相が定義されている属性の場合のみ色を変更
             const hairHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
@@ -983,7 +1022,7 @@ function renderAdventurerList() {
         }
         row.innerHTML = `
             <td>${nameCellHtml}</td>
-            <td>${adv.gender}/${adv.age !== null ? adv.age + '歳' : '不詳'}</td>
+            <td>${adv.gender}/${adv.age !== null ? adv.age + '歳' : '伝説'}</td>
             <td class="adventurer-attribute-cell">${attributeHtml}</td>
             <td>${getStyledRankHtml(adv.rank)}</td>
             <td>${adv.ovr}</td>
@@ -1005,11 +1044,7 @@ function renderAdventurerList() {
 
     // --- 各パーツを組み立て ---
     wrapper.appendChild(tableContainer);
-    wrapper.appendChild(projectionContainer);
     adventurerListEl.appendChild(wrapper);
-
-    // --- 収支予測をレンダリング ---
-    renderProjectionSummary(projectionContainer);
 }
 
 /**
@@ -1273,7 +1308,7 @@ function renderScoutCandidates(policyKey) {
         // 属性とスキルの表示
         const attribute = ATTRIBUTES[candidate.attribute];
         const textColor = getContrastColor(attribute?.color);
-        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};" title="${attribute.description}">${attribute.name}</span>` : 'なし';
+        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor}; cursor: pointer;" onclick="showAttributeDetails('${candidate.attribute}')">${attribute.name}</span>` : 'なし';
 
         row.innerHTML = `
             <td><input type="checkbox" name="candidate" value="${candidate.id}" data-cost="${candidate.joinCost}"></td>
@@ -1420,11 +1455,11 @@ function cancelScout() {
 function calculateSuccessRate(quest, sentAdventurers) {
     if (sentAdventurers.length === 0) return 0;
     
-    // 昇級試験かどうかの判定 (quest.isPromotionで判定)
-    const isPromotion = quest.isPromotion === true;
+    // ★ 昇級試験または特別訓練かどうかの判定
+    const isSpecialSoloQuest = quest.isPromotion || quest.isTraining;
 
-    if (isPromotion) {
-        // 昇級試験の場合
+    if (isSpecialSoloQuest) {
+        // 昇級試験・特別訓練の場合
         if (sentAdventurers.length !== 1) {
             // 複数名での受験は想定外、最低成功率を返す
             return PROMOTION_BASE_SUCCESS_RATE / 100;
@@ -1490,21 +1525,15 @@ function calculateSuccessRate(quest, sentAdventurers) {
     }
 }
 
-
-// クエスト一覧を表示
 function renderQuests() {
     questsEl.innerHTML = ''; 
     questDetailAreaEl.style.display = 'none'; 
     adventurerListEl.style.display = 'block'; 
 
-    // ★ おすすめ割り当てボタンの表示を更新
     updateAutoAssignButtonVisibility();
 
-    // ★ 12月はストーリー任務のみ表示
     if (currentMonth === 12) {
-        // その年のストーリー任務を取得
         const storyQuest = getStoryQuestForYear(currentYear);
-        // ストーリー任務が既に派遣予定に入っているか確認
         const isStoryQuestInProgress = questsInProgress.some(qData => qData.quest.id === storyQuest?.id);
 
         if (storyQuest && !isStoryQuestInProgress) { // ★ 派遣予定に入っていない場合のみ表示
@@ -1526,14 +1555,33 @@ function renderQuests() {
             `;
             questsEl.appendChild(questDiv);
         } else {
-            // ストーリー任務がない、または既に派遣予定の場合のメッセージ
             const message = isStoryQuestInProgress 
                 ? '<p>ストーリー任務は派遣予定です。結果は「Next Month」で確認できます。</p>'
                 : '<p>今年のストーリー任務はありません。</p>';
             questsEl.innerHTML = message;
         }
-        return; // 通常クエストの描画をスキップ
+        return;
     }
+
+    // --- レイアウトコンテナを作成 ---
+    const questLayoutContainer = document.createElement('div');
+    questLayoutContainer.className = 'quest-layout-container';
+
+    const topRowContainer = document.createElement('div');
+    topRowContainer.className = 'quest-top-row';
+
+    const promotionColumn = document.createElement('div');
+    promotionColumn.className = 'quest-column promotion-column';
+    promotionColumn.innerHTML = '<h2>🎓 昇級試験</h2>';
+
+    const trainingColumn = document.createElement('div');
+    trainingColumn.className = 'quest-column training-column';
+    trainingColumn.innerHTML = '<h2>✨ 特別訓練</h2>';
+
+    topRowContainer.appendChild(promotionColumn);
+    topRowContainer.appendChild(trainingColumn);
+    questLayoutContainer.appendChild(topRowContainer);
+    questsEl.appendChild(questLayoutContainer);
 
     let hasAvailableQuest = false;
 
@@ -1572,29 +1620,97 @@ function renderQuests() {
     });
 
     // --- ソートされた昇級試験の表示 ---
-    promotionExams.forEach(pQuest => {
-        const adv = pQuest.adv;
-        if (adv) {
-            const questDiv = document.createElement('div');
-            questDiv.className = 'quest-item promotion-exam';
-            const statusColor = pQuest.estimatedRate >= 0.7 ? 'green' : (pQuest.estimatedRate >= 0.5 ? 'orange' : 'red');
+    if (promotionExams.length > 0) {
+        promotionExams.forEach(pQuest => {
+            const adv = pQuest.adv;
+            if (adv) {
+                const questDiv = document.createElement('div');
+                questDiv.className = 'quest-item promotion-exam';
+                const statusColor = pQuest.estimatedRate >= 0.7 ? 'green' : (pQuest.estimatedRate >= 0.5 ? 'orange' : 'red');
 
-            questDiv.innerHTML = `
-                <h4>🎓 昇級試験: ${pQuest.name}</h4>
-                <p><strong>目標OVR:</strong> ${pQuest.difficulty} / **${adv.name} のOVR: ${adv.ovr}**</p>
-                <p><strong>成功率目安:</strong> <span style="font-weight:bold; color:${statusColor};">${Math.round(pQuest.estimatedRate * 100)}%</span></p>
-                <p style="font-size:0.9em;">※この任務は**${adv.name}単独**で挑みます。成功すると${pQuest.nextRank}ランクに昇級します。</p>
-                <button onclick="showQuestSelection(${pQuest.id}, ${adv.id})">
-                    試験を受ける
-                </button>
-            `;
-            questsEl.appendChild(questDiv);
-            hasAvailableQuest = true;
+                questDiv.innerHTML = `
+                    <h3>🎓 昇級試験: ${pQuest.name}</h3>
+                    <p><strong>目標OVR:</strong> ${pQuest.difficulty} / **${adv.name} のOVR: ${adv.ovr}**</p>
+                    <p><strong>成功率目安:</strong> <span style="font-weight:bold; color:${statusColor};">${Math.round(pQuest.estimatedRate * 100)}%</span></p>
+                    <p style="font-size:0.9em;">※この任務は**${adv.name}単独**で挑みます。成功すると${pQuest.nextRank}ランクに昇級します。</p>
+                    <button onclick="showQuestSelection(${pQuest.id}, ${adv.id})">
+                        試験を受ける
+                    </button>
+                `;
+                promotionColumn.appendChild(questDiv);
+                hasAvailableQuest = true;
+            }
+        });
+    } else {
+        promotionColumn.innerHTML += '<p>現在、受験可能な冒険者はいません。</p>';
+    }
+
+    // --- 特別訓練クエストの生成と表示 ---
+    const trainingQuests = [];
+    adventurers.forEach(adv => {
+        const attribute = ATTRIBUTES[adv.attribute];
+        if (adv.status === '待機中' && !adv.isInherited && attribute && attribute.rarity !== 'Epic') {
+            // ★★★ 動的に次の属性を生成するロジックに変更 ★★★
+            const nextRarityMap = { 'Common': 'Uncommon', 'Uncommon': 'Rare', 'Rare': 'Epic' };
+            const nextRarity = nextRarityMap[attribute.rarity];
+            if (nextRarity) {
+                // ★★★ 属性レアリティに基づいて難易度を設定 ★★★
+                let trainingDifficulty;
+                switch (attribute.rarity) {
+                    case 'Common':   trainingDifficulty = 120; break;
+                    case 'Uncommon': trainingDifficulty = 150; break;
+                    case 'Rare':     trainingDifficulty = 200; break;
+                    default:         trainingDifficulty = 120; // フォールバック
+                }
+                // ★★★ 修正ここまで ★★★
+
+                const nextName = attribute.name + '+';
+                const trainingQuest = {
+                    id: 3000 + adv.id,
+                    name: `属性強化訓練 (${attribute.name} → ${nextName})`,
+                    difficulty: trainingDifficulty,
+                    aptitudes: { combat: '無関係', magic: '無関係', exploration: '無関係' },
+                    isTraining: true,
+                    adv: adv,
+                };
+                trainingQuest.estimatedRate = calculateSuccessRate(trainingQuest, [adv]);
+                trainingQuests.push(trainingQuest);
+            }
         }
     });
 
+    trainingQuests.sort((a, b) => b.estimatedRate - a.estimatedRate);
+
+    if (trainingQuests.length > 0) {
+        trainingQuests.forEach(tQuest => {
+            const adv = tQuest.adv;
+            const currentAttribute = ATTRIBUTES[adv.attribute];
+            const nextRarityMap = { 'Common': 'Uncommon', 'Uncommon': 'Rare', 'Rare': 'Epic' };
+            const nextRarity = nextRarityMap[currentAttribute.rarity];
+            const questDiv = document.createElement('div');
+            questDiv.className = 'quest-item training-quest';
+            const statusColor = tQuest.estimatedRate >= 0.7 ? 'green' : (tQuest.estimatedRate >= 0.5 ? 'orange' : 'red');
+
+            questDiv.innerHTML = `
+                <h3>✨ ${tQuest.name}</h3>
+                <p><strong>目標OVR:</strong> ${tQuest.difficulty} / <strong>${adv.name} のOVR: ${adv.ovr}</strong></p>
+                <p><strong>成功率目安:</strong> <span style="font-weight:bold; color:${statusColor};">${Math.round(tQuest.estimatedRate * 100)}%</span></p>
+                <p style="font-size:0.9em;">成功すると属性が <span class="rarity-${nextRarity.toLowerCase()}">${currentAttribute.name}+</span> に進化します。</p>
+                <button onclick="showQuestSelection(${tQuest.id}, ${adv.id})">訓練を受ける</button>
+            `;
+            trainingColumn.appendChild(questDiv);
+            hasAvailableQuest = true;
+        });
+    } else {
+        trainingColumn.innerHTML += '<p>現在、訓練可能な冒険者はいません。</p>';
+    }
+
     // --- 通常クエストの表示 ---
-    // 表示可能な通常クエストをフィルタリング
+    const regularQuestColumn = document.createElement('div');
+    regularQuestColumn.className = 'quest-column regular-quest-column full-width-column';
+    regularQuestColumn.innerHTML = '<h2>📜 任務</h2>';
+    questLayoutContainer.appendChild(regularQuestColumn);
+
     const displayableQuests = quests.filter(quest => {
         if (quest.requiredRank) {
             const requiredRankIndex = RANKS.indexOf(quest.requiredRank);
@@ -1607,42 +1723,40 @@ function renderQuests() {
         return quest.available;
     });
 
-    // ★ 難易度(difficulty)の降順でソート
     displayableQuests.sort((a, b) => b.difficulty - a.difficulty);
 
-    // ソートされたクエストを描画
-    displayableQuests.forEach(quest => {
-        hasAvailableQuest = true;
-        const questDiv = document.createElement('div');
-        questDiv.className = 'quest-item';
-        
-        const rankRequirementHtml = quest.requiredRank 
-            ? `<p style="color: #c0392b; font-weight: bold;">推奨ランク: ${quest.requiredRank}以上</p>` 
-            : '';
+    if (displayableQuests.length > 0) {
+        displayableQuests.forEach(quest => {
+            hasAvailableQuest = true;
+            const questDiv = document.createElement('div');
+            questDiv.className = 'quest-item';
+            
+            const rankRequirementHtml = quest.requiredRank 
+                ? `<p style="color: #c0392b; font-weight: bold;">推奨ランク: ${quest.requiredRank}以上</p>` 
+                : '';
 
-        let aptitudesText = '';
-        for (const skill in quest.aptitudes) {
-            const value = quest.aptitudes[skill];
-            if (value !== '無関係') {
-                aptitudesText += `${skill.substring(0, 1).toUpperCase()}: ${value} / `;
+            let aptitudesText = '';
+            for (const skill in quest.aptitudes) {
+                const value = quest.aptitudes[skill];
+                if (value !== '無関係') {
+                    aptitudesText += `${skill.substring(0, 1).toUpperCase()}: ${value} / `;
+                }
             }
-        }
-        aptitudesText = aptitudesText.substring(0, aptitudesText.length - 3);
+            aptitudesText = aptitudesText.substring(0, aptitudesText.length - 3);
 
-        questDiv.innerHTML = `
-            <h3>${quest.name}</h3>
-            ${rankRequirementHtml}
-            <p>報酬: ${getQuestReward(quest)} 万G</p>
-            <p>適正能力: ${aptitudesText} (難易度合計: ${quest.difficulty})</p>
-            <button onclick="showQuestSelection(${quest.id})">
-                派遣メンバーを選択
-            </button>
-        `;
-        questsEl.appendChild(questDiv);
-    });
-
-    if (!hasAvailableQuest) {
-        questsEl.innerHTML = '<p>現在、他に利用可能なクエストはありません。次の日の依頼を待ちましょう。</p>';
+            questDiv.innerHTML = `
+                <h3>${quest.name}</h3>
+                ${rankRequirementHtml}
+                <p>報酬: ${getQuestReward(quest)} 万G</p>
+                <p>適正能力: ${aptitudesText} (難易度合計: ${quest.difficulty})</p>
+                <button onclick="showQuestSelection(${quest.id})">
+                    派遣メンバーを選択
+                </button>
+            `;
+            regularQuestColumn.appendChild(questDiv);
+        });
+    } else {
+        regularQuestColumn.innerHTML += '<p>現在、他に利用可能なクエストはありません。</p>';
     }
 }
 
@@ -1659,8 +1773,33 @@ function showQuestSelection(questId, targetAdvId = null) {
     const isPromotion = questId >= 1000 && targetAdvId !== null;
     // ★ ストーリー任務の判定 (IDが2000番台)
     const isStoryQuest = questId >= 2001 && questId <= 2010;
+    // ★ 特別訓練の判定 (IDが3000番台)
+    const isTraining = questId >= 3000 && targetAdvId !== null;
+ 
+    // ★★★ 判別順序を変更: isTrainingを先に評価する ★★★
+    if (isTraining) {
+        const adv = adventurers.find(a => a.id === targetAdvId);
+        if (!adv) return;
+        const attribute = ATTRIBUTES[adv.attribute]; 
+        // ★★★ 属性レアリティに基づいて難易度を設定 ★★★
+        let trainingDifficulty;
+        switch (attribute.rarity) {
+            case 'Common':   trainingDifficulty = 120; break;
+            case 'Uncommon': trainingDifficulty = 150; break;
+            case 'Rare':     trainingDifficulty = 200; break;
+            default:         trainingDifficulty = 120; // フォールバック
+        }
+        // ★★★ 修正ここまで ★★★
 
-    if (isPromotion) {
+        quest = {
+            id: questId,
+            name: `属性強化訓練 (${attribute.name} → ${attribute.name}+)`,
+            difficulty: trainingDifficulty,
+            aptitudes: { combat: '無関係', magic: '無関係', exploration: '無関係' },
+            isTraining: true,
+            advId: adv.id,
+        };
+    } else if (isPromotion) {
         const adv = adventurers.find(a => a.id === targetAdvId);
         if (!adv || adv.rank === 'V') return; // ★ Sランクでも試験を受けられるように修正 (Vランクは最終)
         
@@ -1678,6 +1817,7 @@ function showQuestSelection(questId, targetAdvId = null) {
             isPromotion: true,
             advId: adv.id
         };
+
         // クエスト一覧から元のクエストを見つける
     } else {
         // ★ ストーリー任務の場合
@@ -1709,15 +1849,19 @@ function showQuestSelection(questId, targetAdvId = null) {
     }
     aptitudesText = aptitudesText.substring(0, aptitudesText.length - 3);
 
-    const maxAdventurers = quest.isPromotion ? 1 : 4; // ★ ストーリーも4人まで
+    const maxAdventurers = (quest.isPromotion || quest.isTraining) ? 1 : 4;
     const selectionInfo = quest.isPromotion 
         ? `<p style="color:red; font-weight:bold;">この試験は${adventurers.find(a => a.id === targetAdvId).name}単独での受験となります。他メンバーは選択できません。</p>`
+        : quest.isTraining
+        ? `<p style="color:#85C1E9; font-weight:bold;">この訓練は${adventurers.find(a => a.id === targetAdvId).name}単独で実行します。他メンバーは選択できません。</p>`
         : quest.isStory
         ? `<p style="color:red; font-weight:bold;">ギルドの存亡をかけた戦いです。待機中のメンバーから精鋭を選び、任務に挑みます (最大${maxAdventurers}名)。</p>`
         : `<p><strong>派遣する冒険者を選択してください (最大${maxAdventurers}名):</strong></p>`;
 
-    const rewardText = quest.isStory ? '任務成功で次年へ' : `${getQuestReward(quest)} 万G`;
-    const difficultyText = quest.isPromotion ? `目標OVR: ${quest.difficulty}` : `適正能力 (目標合計: ${quest.difficulty})`;
+    const rewardText = quest.isStory ? '任務成功で次年へ'
+        : (quest.isPromotion || quest.isTraining) ? 'なし' // ★ 昇級・訓練は報酬なし
+        : `${getQuestReward(quest)} 万G`;
+    const difficultyText = (quest.isPromotion || quest.isTraining) ? `目標OVR: ${quest.difficulty}` : `適正能力 (目標合計: ${quest.difficulty})`;
 
 
     questDetailAreaEl.innerHTML += `
@@ -1745,7 +1889,7 @@ function showQuestSelection(questId, targetAdvId = null) {
                 <th>獲得予定EXP (成功時)</th> </tr>
         </table>
         <div style="text-align: center; margin-top: 20px;">
-            <button id="send-quest-button" ${quest.isPromotion ? 'class="promotion-dispatch-button"' : (quest.isStory ? 'class="story-dispatch-button"' : '')} onclick="sendAdventurersToQuest(${quest.id}, ${quest.isPromotion}, ${quest.isPromotion ? targetAdvId : null})" disabled>派遣予定に入れる</button>
+            <button id="send-quest-button" ${quest.isPromotion ? 'class="promotion-dispatch-button"' : (quest.isStory ? 'class="story-dispatch-button"' : '')} onclick="sendAdventurersToQuest(${quest.id}, ${quest.isPromotion || quest.isTraining}, ${targetAdvId})" disabled>派遣予定に入れる</button>
             <button onclick="cancelQuestSelection()">キャンセル</button>
         </div>
     `;
@@ -1763,7 +1907,7 @@ function showQuestSelection(questId, targetAdvId = null) {
     }
 
     // 昇級試験の場合は対象者のみをリストアップ
-    if (quest.isPromotion) {
+    if (quest.isPromotion || quest.isTraining) {
         availableAdventurers = availableAdventurers.filter(adv => adv.id === targetAdvId);
     }
 
@@ -1772,7 +1916,7 @@ function showQuestSelection(questId, targetAdvId = null) {
         const expPercentage = Math.min(100, (adv.exp / adv.expToLevelUp) * 100);
         
         // 昇級試験の場合はチェックボックスを強制的にチェック済み・無効化
-        const checked = quest.isPromotion ? 'checked disabled' : '';
+        const checked = (quest.isPromotion || quest.isTraining) ? 'checked disabled' : '';
 
         // ★ 引継ぎ冒険者の名前スタイルを定義
         let nameStyle = `border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;`;
@@ -1899,7 +2043,11 @@ function autoAssignQuests() {
  * @param {Array} sentAdventurers - 派遣する冒険者の配列
  */
 function sendAdventurersToQuestInternal(quest, sentAdventurers) {
-    quest.available = false;
+    // 通常クエストの場合のみavailableをfalseにする
+    if (!quest.isPromotion && !quest.isTraining && !quest.isStory) {
+        const originalQuest = quests.find(q => q.id === quest.id);
+        if (originalQuest) originalQuest.available = false;
+    }
     const successRate = calculateSuccessRate(quest, sentAdventurers);
     sentAdventurers.forEach(adv => adv.status = `クエスト予定: ${quest.name}`);
     questsInProgress.push({
@@ -1966,7 +2114,7 @@ function updateQuestSuccessRate(quest) {
     });
 
     // 派遣ボタンの有効化: 1人以上選択されていればOK (昇級試験の場合は強制的に1人)
-    if (quest.isPromotion) {
+    if (quest.isPromotion || quest.isTraining) {
         sendButton.disabled = selectedAdventurers.length !== 1;
     } else {
         // 通常・ストーリークエストは最大4人
@@ -1974,43 +2122,127 @@ function updateQuestSuccessRate(quest) {
     }
 }
 
+/**
+ * 指定された冒険者をワンクリックで昇級試験に派遣します。
+ * @param {number} advId - 冒険者のID
+ */
+function startPromotionExam(advId) {
+    const adv = adventurers.find(a => a.id === advId);
+    if (!adv || adv.status !== '待機中' || adv.rank === 'V') {
+        alert('この冒険者は現在、昇級試験を受けられません。');
+        return;
+    }
+
+    const currentRankIndex = RANKS.indexOf(adv.rank);
+    const nextRank = RANKS[currentRankIndex + 1];
+    const requiredDifficulty = PROMOTION_DIFFICULTIES[adv.rank];
+
+    const promotionQuest = {
+        id: 1000 + adv.id,
+        name: `${adv.name} の昇級試験 (${adv.rank} → ${nextRank})`,
+        difficulty: requiredDifficulty,
+        isPromotion: true,
+    };
+
+    sendAdventurersToQuestInternal(promotionQuest, [adv]);
+    alert(`【${promotionQuest.name}】に派遣予定を入れました。`);
+    updateDisplay();
+}
+
+/**
+ * 指定された冒険者をワンクリックで特別訓練に派遣します。
+ * @param {number} advId - 冒険者のID
+ */
+function startSpecialTraining(advId) {
+    const adv = adventurers.find(a => a.id === advId);
+    const attribute = adv ? ATTRIBUTES[adv.attribute] : null;
+
+    if (!adv || adv.status !== '待機中' || adv.isInherited || !attribute || attribute.rarity === 'Epic') {
+        alert('この冒険者は現在、特別訓練を受けられません。');
+        return;
+    }
+
+    let trainingDifficulty;
+    switch (attribute.rarity) {
+        case 'Common':   trainingDifficulty = 120; break;
+        case 'Uncommon': trainingDifficulty = 150; break;
+        case 'Rare':     trainingDifficulty = 200; break;
+        default:         trainingDifficulty = 120;
+    }
+
+    const trainingQuest = {
+        id: 3000 + adv.id,
+        name: `属性強化訓練 (${attribute.name} → ${attribute.name}+)`,
+        difficulty: trainingDifficulty,
+        isTraining: true,
+    };
+
+    sendAdventurersToQuestInternal(trainingQuest, [adv]);
+    alert(`【${trainingQuest.name}】に派遣予定を入れました。`);
+    updateDisplay();
+}
+
+/**
+ * 指定された冒険者に最適なおすすめ任務を割り当てます。
+ * @param {number} advId - 冒険者のID
+ */
+function assignRecommendedQuest(advId) {
+    const adv = adventurers.find(a => a.id === advId);
+    if (!adv || adv.status !== '待機中') {
+        alert('この冒険者は現在、任務を受けられません。');
+        return;
+    }
+
+    let bestQuest = null;
+    let maxDifficulty = -1;
+
+    const availableQuests = quests.filter(q => q.available && (!q.requiredRank || RANKS.indexOf(adv.rank) >= RANKS.indexOf(q.requiredRank)));
+
+    for (const quest of availableQuests) {
+        const successRate = calculateSuccessRate(quest, [adv]);
+        if (successRate >= 0.8 && quest.difficulty > maxDifficulty) {
+            maxDifficulty = quest.difficulty;
+            bestQuest = quest;
+        }
+    }
+
+    if (bestQuest) {
+        sendAdventurersToQuestInternal(bestQuest, [adv]);
+        alert(`${adv.name}を【${bestQuest.name}】に派遣予定を入れました。`);
+        updateDisplay();
+    } else {
+        alert(`${adv.name}に適した単独任務が見つかりませんでした。`);
+    }
+}
 
 /**
  * 選択された冒険者をクエストに派遣予定に入れます。
  * @param {number} questId - クエストID
  * @param {boolean} isPromotion - 昇級試験かどうか
- * @param {number} [targetAdvId=null] - 昇級試験の場合、対象の冒険者のID
+ * @param {number} [targetAdvId=null] - 昇級試験または特別訓練の場合、対象の冒険者のID
  */
-function sendAdventurersToQuest(questId, isPromotion, targetAdvId = null) {
+function sendAdventurersToQuest(questId, _isSpecial, targetAdvId = null) {
     const checkedCheckboxes = document.querySelectorAll('#quest-candidate-table input[type="checkbox"]:checked');
     const selectedIds = Array.from(checkedCheckboxes).map(cb => parseInt(cb.value));
     const sentAdventurers = adventurers.filter(adv => selectedIds.includes(adv.id));
 
-    let quest; // ★関数のスコープで変数を宣言
-    // ★ ストーリー任務の判定
+    let quest;
     const isStoryQuest = questId >= 2001 && questId <= 2010;
-
-    if (isPromotion) {
-        let adv = sentAdventurers[0];
-        if (!adv) return;
-        const currentRankIndex = RANKS.indexOf(adv.rank);
-        const nextRank = RANKS[currentRankIndex + 1];
-        quest = {
-            id: questId,
-            name: `${adv.name} の昇級試験 (${adv.rank} → ${nextRank})`,
-            difficulty: PROMOTION_DIFFICULTIES[adv.rank],
-            isPromotion: true,
-        };
-        sendAdventurersToQuestInternal(quest, sentAdventurers);
-    } else if (isStoryQuest) {
-        quest = getStoryQuestForYear(currentYear); // questに代入
-        quest.isStory = true;
-        sendAdventurersToQuestInternal(quest, sentAdventurers);
-
-    } else {
-        quest = quests.find(q => q.id === questId); // questに代入
+    const isTraining = questId >= 3000 && targetAdvId !== null;
+    const isPromotion = questId >= 1000 && !isTraining && targetAdvId !== null;
+ 
+    if (isTraining) {
+        quest = questsInProgress.find(q => q.quest.id === questId)?.quest;
+        if (!quest) return; // 既に内部処理されているはずなので基本的には見つかる
+    } else if (isPromotion) {
+        quest = questsInProgress.find(q => q.quest.id === questId)?.quest;
         if (!quest) return;
-        sendAdventurersToQuestInternal(quest, sentAdventurers);
+    } else if (isStoryQuest) {
+        quest = getStoryQuestForYear(currentYear);
+        quest.isStory = true;
+    } else {
+        quest = quests.find(q => q.id === questId);
+        if (!quest) return;
     }
 
     // 3. UIを更新
@@ -2312,6 +2544,7 @@ function processQuestsResults(isGameOverCheckOnly = false) {
     let totalIncome = 0;
     let totalExpense = 0;
     let levelUpMessages = [];
+    let trainingMessages = []; // ★ 訓練メッセージ用
     let promotionMessages = []; // 昇級メッセージ用
 
     questsInProgress.forEach(qData => {
@@ -2381,6 +2614,48 @@ function processQuestsResults(isGameOverCheckOnly = false) {
 
                 resultMessage = `✅ 成功: 昇級！`;
 
+            } else if (quest.isTraining) {
+                // 特別訓練成功
+                const adv = sentAdventurers[0];
+                const oldAttribute = ATTRIBUTES[adv.attribute];
+                const nextRarityMap = { 'Common': 'Uncommon', 'Uncommon': 'Rare', 'Rare': 'Epic' };
+                const nextRarity = nextRarityMap[oldAttribute.rarity];
+
+                // ★★★ 属性アップグレードロジックを動的生成に戻す ★★★
+                // 新しい属性を動的に生成
+                const newAttributeKey = `${adv.attribute}_plus_${Date.now()}`; // 一意のキーを生成
+                const newAttribute = {
+                    ...oldAttribute, // 基本情報（ボーナス含む）をコピー
+                    name: oldAttribute.name + '+',
+                    rarity: nextRarity,
+                };
+                ATTRIBUTES[newAttributeKey] = newAttribute; // グローバルオブジェクトに新しい属性を追加
+
+                // ★★★ 新しい属性のレベルアップボーナスを強化する ★★★
+                const bonusStats = ['combat', 'magic', 'exploration'];
+                const randomBonusStat = bonusStats[Math.floor(Math.random() * bonusStats.length)];
+                // 新しいボーナスオブジェクトを作成し、元のボーナスをコピー
+                newAttribute.bonus = { ...oldAttribute.bonus };
+                // ランダムなスキルに+1する（既存なら加算、なければ新規追加）
+                newAttribute.bonus[randomBonusStat] = (newAttribute.bonus[randomBonusStat] || 0) + 1;
+                // ★★★ 修正ここまで ★★★
+
+                adv.attribute = newAttributeKey; // 冒険者の属性を更新
+
+                // レアリティアップ時のボーナス
+                const stats = ['combat', 'magic', 'exploration'];
+                const randomStat = stats[Math.floor(Math.random() * stats.length)];
+                const bonusValue = (newAttribute.rarity === 'Epic') ? 2 : 1;
+                adv.skills[randomStat] += bonusValue;
+                adv.ovr += bonusValue; // OVRも更新
+
+                // ★ 最高記録を更新
+                updateAllTimeRecord(adv);
+
+                trainingMessages.push(`✨ ${adv.name} は訓練に成功！ 属性が「${oldAttribute.name}」から「${newAttribute.name}」に進化し、${randomStat}スキルが+${bonusValue}上昇しました！ (EXP+${averageGainedExp}P)`);
+
+                resultMessage = `✅ 成功: 昇級！`;
+
             } else {
                 // 通常クエスト成功
                 const actualReward = getQuestReward(quest);
@@ -2405,9 +2680,14 @@ function processQuestsResults(isGameOverCheckOnly = false) {
                 promotionMessages.push(`😥 ${adv.name} は昇級試験に失敗しました。次月以降に再挑戦できます。 (EXP+${averageGainedExp}P)`);
                 resultMessage = `❌ 失敗: 昇級できず`;
 
+            } else if (quest.isTraining) {
+                // 特別訓練失敗
+                const adv = sentAdventurers[0];
+                trainingMessages.push(`😥 ${adv.name} は属性強化訓練に失敗しました。 (EXP+${averageGainedExp}P)`);
+                resultMessage = `❌ 失敗: 属性は変わらず`;
             } else {
                 // 通常クエスト失敗
-                const penalty = Math.floor(getQuestReward(quest) / 2);
+                const penalty = Math.floor(getQuestReward(quest) / 2) || 0; // ★ 報酬がない場合にNaNになるのを防ぐ
                 gold -= penalty;
                 totalExpense += penalty;
                 resultMessage = `❌ 失敗: -${penalty} 万G (ペナルティ)`;
@@ -2429,6 +2709,11 @@ function processQuestsResults(isGameOverCheckOnly = false) {
     // 進行中リストをクリア
     questsInProgress = [];
     
+    // 訓練メッセージを先に表示
+    if (trainingMessages.length > 0) {
+        message += `\n**【特別訓練報告】**\n` + trainingMessages.join('\n') + '\n';
+    }
+
     // 昇級メッセージを先に表示
     if (promotionMessages.length > 0) {
         message += `\n**【昇級報告】**\n` + promotionMessages.join('\n') + '\n';
@@ -2579,13 +2864,14 @@ function renderHallOfFameTable(containerId) {
         // ★ 属性表示用のHTMLを生成
         const attribute = ATTRIBUTES[record.attribute];
         const textColor = getContrastColor(attribute?.color);
-        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};" title="${attribute.description}">${attribute.name}</span>` : 'なし';
+        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor}; cursor: pointer;" onclick="showAttributeDetails('${record.attribute}')">${attribute.name}</span>` : 'なし';
 
         // ★ アバター表示用のHTMLを生成
         let nameCellHtml;
         if (record.avatar) {
-            const attributeName = ATTRIBUTES[record.attribute]?.name;
-            const baseHue = ELEMENT_HUES[attributeName] ?? null;
+            // ★ '+'付きの属性でも元の名前で色を取得する
+            const originalAttributeName = ATTRIBUTES[record.attribute]?.name.replace('+', '');
+            const baseHue = ELEMENT_HUES[originalAttributeName] ?? null;
             const hairHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
             const eyesHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
             const faceStyle = getPartStyle('face', record.avatar.face);
@@ -2914,13 +3200,14 @@ function renderHallOfFame(records, containerId) {
         // ★ 属性表示用のHTMLを生成
         const attribute = ATTRIBUTES[record.attribute];
         const textColor = getContrastColor(attribute?.color);
-        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};" title="${attribute.description}">${attribute.name}</span>` : 'なし';
+        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor}; cursor: pointer;" onclick="showAttributeDetails('${record.attribute}')">${attribute.name}</span>` : 'なし';
 
         // ★ アバター表示用のHTMLを生成
         let nameCellHtml;
         if (record.avatar) {
-            const attributeName = ATTRIBUTES[record.attribute]?.name;
-            const baseHue = ELEMENT_HUES[attributeName] ?? null;
+            // ★ '+'付きの属性でも元の名前で色を取得する
+            const originalAttributeName = ATTRIBUTES[record.attribute]?.name.replace('+', '');
+            const baseHue = ELEMENT_HUES[originalAttributeName] ?? null;
             const hairHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
             const eyesHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
             const faceStyle = getPartStyle('face', record.avatar.face);
@@ -3298,6 +3585,21 @@ function renderStylishHomeScreen() {
             padding-bottom: 10px;
             margin-bottom: 10px;
         }
+        /* 属性詳細モーダルのスタイル */
+        .attribute-detail-content {
+            background-color: #2c3e50;
+            padding: 25px;
+            border-radius: 8px;
+            border: 1px solid #7f8c8d;
+            width: 90%;
+            max-width: 500px;
+        }
+        .attribute-detail-content h3 {
+            margin-top: 0;
+            border-bottom: 1px solid #7f8c8d;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
         .positive-balance { color: #2ecc71; }
         .negative-balance { color: #e74c3c; }
         
@@ -3320,6 +3622,103 @@ function renderStylishHomeScreen() {
             background-color: #27ae60;
             border-color: #27ae60;
         }
+
+        /* アクションボタンのスタイル */
+        .action-btn-promotion { background-color: #8e44ad; border-color: #9b59b6; color: white; }
+        .action-btn-promotion:hover { background-color: #9b59b6; }
+        .action-btn-training { background-color: #f39c12; border-color: #f1c40f; color: white; }
+        .action-btn-training:hover { background-color: #f1c40f; }
+        .action-btn-recommend { background-color: #2980b9; border-color: #3498db; color: white; }
+        .action-btn-recommend:hover { background-color: #3498db; }
+
+
+
+        /* クエスト表示のレイアウト */
+        .quest-layout-container {
+            display: flex;
+            flex-direction: column; /* 縦並びに変更 */
+            gap: 20px;
+            width: 100%;
+        }
+        .quest-top-row {
+            display: flex;
+            gap: 20px; /* カラム間のスペース */
+            width: 100%;
+        }
+
+        .quest-column {
+            flex: 1; /* 各カラムが均等な幅を占める */
+            background-color: #34495e; /* カラムの背景色 */
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #7f8c8d;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        /* 特別訓練カラムのスタイル */
+        .training-column {
+            border-color: #f1c40f; /* 金色の枠線 */
+        }
+
+
+        .quest-column h2 { /* カラムタイトル */
+            margin-top: 0;
+            border-bottom: 1px solid #7f8c8d;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            color: #ecf0f1;
+            text-align: center;
+        }
+
+        .quest-item h3 { /* クエストタイトル */
+            color: #34495e; /* 明るい青色に変更して視認性を向上 */
+            margin-top: 0;
+        }
+        
+        /* 冒険者リストの背景色 */
+        .rarity-bg-common {
+            background-color: #f8f9fa; /* 少しだけ色がついた白 */
+        }
+        .rarity-bg-uncommon {
+            background: linear-gradient(to bottom, #e9ecef, #ced4da); /* 銀色の光沢 */
+        }
+        .rarity-bg-rare {
+            background: linear-gradient(to bottom, #fff3cd, #f8d775); /* 金色の光沢 */
+        }
+        .rarity-bg-epic {
+            background: linear-gradient(135deg, #6a0dad, #c0392b, #2c3e50, #16a085);
+            background-size: 400% 400%;
+            animation: epic-bg-anim 15s ease infinite;
+            color: #fff; /* テキスト色を白に */
+        }
+        /* エピック背景を持つ行のテキストシャドウ */
+        .rarity-bg-epic td {
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+        }
+
+        @keyframes epic-bg-anim {
+            0%{background-position:0% 50%}
+            50%{background-position:100% 50%}
+            100%{background-position:0% 50%}
+        }
+
+        /* 引継ぎ冒険者リストの背景エフェクト */
+        .rarity-bg-inherited {
+            background: linear-gradient(125deg, #ffffff, #33dcf9ff, #ffd700, #33dcf9ff, #ffffff);
+            background-size: 400% 400%;
+            animation: inherited-bg-anim 10s ease infinite;
+        }
+        /* 引継ぎ冒険者のテキストは読みやすいように少し影をつける */
+        .rarity-bg-inherited td {
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+        }
+
+        @keyframes inherited-bg-anim {
+            0%{background-position:0% 50%}
+            50%{background-position:100% 50%}
+            100%{background-position:0% 50%}
+        }
+
+
 
 
 
@@ -3499,6 +3898,80 @@ function showMainMenu() {
     document.getElementById('main-menu').style.display = 'flex';
 }
 // --- 初期化 ---
+
+/**
+ * 属性の詳細情報を表示するモーダルウィンドウを開きます。
+ * @param {string} attributeKey - ATTRIBUTESオブジェクトのキー
+ */
+function showAttributeDetails(attributeKey) {
+    const attribute = ATTRIBUTES[attributeKey];
+    if (!attribute) return;
+
+    // 既存のモーダルがあれば削除
+    const existingModal = document.getElementById('attribute-detail-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    const modal = document.createElement('div');
+    modal.id = 'attribute-detail-modal';
+    modal.className = 'modal-overlay';
+
+    const content = document.createElement('div');
+    content.className = 'attribute-detail-content'; // 新しいスタイルクラス
+
+    // ボーナス表示を整形する内部関数
+    function formatBonus(bonus) {
+        if (!bonus) return 'なし';
+        let text = '';
+        const skillMap = {
+            combat: '戦闘',
+            magic: '魔法',
+            exploration: '探索',
+            random: 'ランダムなスキル',
+            lowest: '最も低いスキル'
+        };
+        for (const key in bonus) {
+            const skillName = skillMap[key] || key;
+            const value = bonus[key];
+            text += `<li>${skillName}: <span style="color: #2ecc71; font-weight: bold;">+${value}</span></li>`;
+        }
+        return `<ul>${text}</ul>`;
+    }
+
+    const textColor = getContrastColor(attribute.color);
+    const attributeNameHtml = `<span class="talent-trait" style="background-color: ${attribute.color}; color: ${textColor};">${attribute.name}</span>`;
+
+    content.innerHTML = `
+        <h3>属性詳細</h3>
+        <p><strong>名前:</strong> ${attributeNameHtml}</p>
+        <p><strong>レアリティ:</strong> <span class="rarity-${attribute.rarity.toLowerCase()}">${attribute.rarity}</span></p>
+        <p><strong>概要:</strong> ${attribute.description}</p>
+        <hr>
+        <p><strong>レベルアップ時ボーナス:</strong></p>
+        ${formatBonus(attribute.bonus)}
+    `;
+
+    const closeButton = document.createElement('button');
+    closeButton.textContent = '閉じる';
+    closeButton.style.marginTop = '20px';
+    closeButton.onclick = () => {
+        modal.remove();
+    };
+
+    content.appendChild(closeButton);
+    modal.appendChild(content);
+    document.body.appendChild(modal);
+
+    // モーダルの外側をクリックしたら閉じる
+    modal.onclick = (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    };
+}
+
+
 
 /**
  * 動的に生成されたDOM要素への参照を再初期化します。
