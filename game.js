@@ -381,9 +381,26 @@ function getStyledRankHtml(rank) {
     let color = 'inherit';
     let textShadow = 'none';
 
-    if (rank.startsWith('X') || rank === 'V') {
-        color = '#ff00ff'; // Magenta for X ranks
-        textShadow = '0 0 5px #ff00ff, 0 0 8px #ff00ff';
+    const xRanks = ['X', 'XG', 'XF', 'XE', 'XD', 'XC', 'XB', 'XA', 'XS', 'XX', 'V'];
+    const xRankIndex = xRanks.indexOf(rank);
+
+    if (xRankIndex !== -1) {
+        // ピンク (#ff00ff) から 水色 (#00ffff) へのグラデーションを計算
+        const totalSteps = xRanks.length - 1;
+        const step = xRankIndex / totalSteps;
+
+        // RGB値を線形補間
+        const r = Math.round(255 * (1 - step));
+        const g = Math.round(255 * step);
+        const b = 255;
+
+        // 16進数カラーコードに変換
+        const toHex = (c) => ('0' + c.toString(16)).slice(-2);
+        color = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+
+        // テキストシャドウも色に合わせて変更
+        textShadow = `0 0 5px ${color}, 0 0 8px ${color}`;
+
     } else {
         switch(rank) {
             case 'S': color = '#FFD700'; textShadow = '0 0 5px #FFD700'; break; // Gold with glow
@@ -527,39 +544,8 @@ function calculateBaseValue(age, baseBonus = 0) {
     return Math.max(minBase, baseValue);
 }
 
-// ランダムな冒険者のデータを生成 (名前リストは省略せず全文記載)
-function generateAdventurer(policyKey) {
-    // --- 新しい属性とスキルの生成ロジック ---
-    // 1. 属性をレア度に基づいて決定
-    const rand = Math.random();
-    let rarity;
-    if (rand < 0.02) rarity = 'Epic';       // 2%
-    else if (rand < 0.12) rarity = 'Rare';  // 10%
-    else if (rand < 0.42) rarity = 'Uncommon'; // 30%
-    else rarity = 'Common';                 // 58%
-
-    const possibleAttributes = Object.keys(ATTRIBUTES).filter(key => ATTRIBUTES[key].rarity === rarity);
-    const selectedAttributeKey = possibleAttributes[Math.floor(Math.random() * possibleAttributes.length)];
-
-    // ★★★ スカウト方針に基づいて年齢を決定 ★★★
-    const policy = SCOUT_POLICIES[policyKey];
-    const minAge = policy.minAge;
-    const maxAge = policy.maxAge;
-
-    // 選択された属性に基づいて、アバターの色相と明るさを一度だけ決定
-    const attribute = ATTRIBUTES[selectedAttributeKey];
-    const originalAttributeName = attribute?.name.replace('+', '');
-    const baseHue = ELEMENT_HUES[originalAttributeName] ?? null;
-    const brightness = ELEMENT_BRIGHTNESS[originalAttributeName] ?? 1.0;
-
-    const advHairHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
-    const advEyesHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
-
-    const age = Math.floor(Math.random() * (maxAge - minAge + 1)) + minAge;
-    
-    const genders = ['男性', '女性'];
-    // 名前リスト
-    const namesMale = ['アーサー', 'アレン', 'アッシュ', 'アベル', 'アレクサンダー', 'アルバート', 'アダム', 'アルカ', 'アリウス', 'アロイス', 'アンドリュー', 'アンセルム', 'アポロ', 'アロン', 'アキレス', 'アエディン', 'アザゼル', 'アルフォンス', 'アリオン', 'アーロン', 'アトラス', 'アザール', 'バルド', 'バートラム', 'ベオウルフ', 'ブライアン', 'ブラン', 'ブルース', 'ブレイズ', 'バルト', 'ベネディクト', 'ビョルン', 'ブロディ', 'ブリアン', 'バレン', 'バシレイオス', 'クリス', 'カイ', 'コナー', 'クレイグ', 'カシウス', 'シド', 'セドリック', 'カレブ', 'カール', 'キャスパー', 'クロード', 'コルビー', 'クライヴ', 'コーネリアス', 'キャメロン', 'セルゲイ', 'ダミアン', 'ダリウス', 'ディーン', 'ドレイク', 'ダグラス', 'デイヴィッド', 'デクスター', 'ディラン', 'ドミニク', 'ドナルド', 'ダンテ', 'デミトリー', 'デューク', 'ダスト', 'エドガー', 'エリック', 'エルマー', 'イーサン', 'エメット', 'エルモア', 'エリク', 'エルヴェ', 'エルウィン', 'エルリック', 'エルネスト', 'エイリアス', 'エリジャ', 'エリオット', 'エドワード', 'エゼル', 'ファング', 'フィン', 'フランシス', 'フェリックス', 'フォレスト', 'フリッツ', 'フィリップ', 'フリン', 'ファビアン', 'フェニックス', 'フェルディナンド', 'フロリアン', 'フォード', 'フレデリック', 'ガレス', 'ガイ', 'ギルバート', 'グレゴリー', 'グラハム', 'グレン', 'ガブリエル', 'ジェフリー', 'ガロード', 'ギデオン', 'グンター', 'ギャビン', 'ゴードン', 'ハロルド', 'ヘンリー', 'ヒュー', 'ハンス', 'ホーク', 'ハドソン', 'ハーヴェイ', 'ホーレス', 'ハンター', 'ハーミーズ', 'ヘクター', 'ハムレット', 'ヒルデブランド', 'ホーガン', 'イアン', 'イグニス', 'アイザック', 'イヴァン', 'イリヤ', 'イシス', 'イサム', 'イーヴァル', 'イチロウ', 'イオリアス', 'イノック', 'ジャック', 'ジェイムズ', 'ジェイソン', 'ジョシュア', 'ジュリアン', 'ジャスティン', 'ジョージ', 'ジョナサン', 'ジョセフ', 'ジェレミー', 'ジェラルド', 'ジェイコブ', 'ジグムント', 'キース', 'ケント', 'カイル', 'ケビン', 'クリスチャン', 'カーティス', 'カスミ', 'クラウス', 'コール', 'コビ', 'キリアン', 'ケネス', 'カイザー', 'ルーク', 'レオ', 'リアム', 'ローガン', 'ランドル', 'ルイス', 'ローレンス', 'ラルフ', 'ランスロット', 'リチャード', 'ライアン', 'ライナス', 'レジナルド', 'マーク', 'マイル', 'モーガン', 'ミゲル', 'マイケル', 'マクシミリアン', 'モーリス', 'マルコム', 'マティアス', 'メルヴィン', 'ミッチェル', 'メイソン', 'マグナス', 'マックス', 'ネイト', 'ネイサン', 'ニコラス', 'ノックス', 'ニール', 'ナッシュ', 'ノア', 'ナルヴィ', 'ノルベルト', 'ネロ', 'ノヴァ', 'オズ', 'オーウェン', 'オリバー', 'オスカー', 'オベロン', 'オディッセウス', 'オディン', 'オーランド', 'オマール', 'オライオン', 'オスリック', 'パイク', 'ポール', 'パーシー', 'ピーター', 'パトリック', 'フェイト', 'パンドラ', 'パーシヴァル', 'ペンドラゴン', 'ピエール', 'パブロ', 'クイン', 'クエンティン', 'クライヴ', 'ロビン', 'ライリー', 'ルーファス', 'ロイド', 'ライアス', 'ラッセル', 'ロジャー', 'ロナルド', 'レイモンド', 'リック', 'ロッキー', 'ロメロ', 'ロック', 'サイラス', 'スコット', 'サム', 'セバスチャン', 'シモン', 'スタン', 'ステファン', 'スチュアート', 'サイモン', 'ソロモン', 'セージ', 'スパーダ', 'スタンリー', 'セス', 'タイガ', 'トビー', 'トマス', 'トレント', 'トロイ', 'テオ', 'テンプル', 'ティアゴ', 'ティム', 'トニー', 'トリスタン', 'ターナー', 'タイラー', 'ウル', 'アーバン', 'ウルフ', 'ユリウス', 'ヴォルフ', 'ヴィクター', 'ヴァンス', 'ヴィンセント', 'ヴァレリオ', 'ヴァルター', 'ヴァイパー', 'ウィル', 'ウォルト', 'ウェス', 'ウィリアム', 'ウォーレン', 'ウェンデル', 'ワイアット', 'ワーウィック', 'ウェズリー', 'ウィンストン', 'ザンダー', 'ザビエル', 'ヨーク', 'ヨーハン', 'ユージーン', 'ザック', 'ゼノス', 'ゼロ', 'ゼイン', 'ゼファー', 'ゼウス', 'セシル', 'デニス', 'エメリー', 'ガーウィン', 'ヒューゴ', 'イシュトヴァーン', 'ジャスパー', 'レオナード', 'マーカス', 'ナポレオン', 'オットー', 'パーシバル', 'ラファエル', 'ローランド', 'シグマ', 'ティベリウス', 'ヴァレリアン', 'ウォルター', 'クセノス', 'ユージン', 'ゼノ'];
+// 名前リスト (グローバルスコープに移動)
+const namesMale = ['アーサー', 'アレン', 'アッシュ', 'アベル', 'アレクサンダー', 'アルバート', 'アダム', 'アルカ', 'アリウス', 'アロイス', 'アンドリュー', 'アンセルム', 'アポロ', 'アロン', 'アキレス', 'アエディン', 'アザゼル', 'アルフォンス', 'アリオン', 'アーロン', 'アトラス', 'アザール', 'バルド', 'バートラム', 'ベオウルフ', 'ブライアン', 'ブラン', 'ブルース', 'ブレイズ', 'バルト', 'ベネディクト', 'ビョルン', 'ブロディ', 'ブリアン', 'バレン', 'バシレイオス', 'クリス', 'カイ', 'コナー', 'クレイグ', 'カシウス', 'シド', 'セドリック', 'カレブ', 'カール', 'キャスパー', 'クロード', 'コルビー', 'クライヴ', 'コーネリアス', 'キャメロン', 'セルゲイ', 'ダミアン', 'ダリウス', 'ディーン', 'ドレイク', 'ダグラス', 'デイヴィッド', 'デクスター', 'ディラン', 'ドミニク', 'ドナルド', 'ダンテ', 'デミトリー', 'デューク', 'ダスト', 'エドガー', 'エリック', 'エルマー', 'イーサン', 'エメット', 'エルモア', 'エリク', 'エルヴェ', 'エルウィン', 'エルリック', 'エルネスト', 'エイリアス', 'エリジャ', 'エリオット', 'エドワード', 'エゼル', 'ファング', 'フィン', 'フランシス', 'フェリックス', 'フォレスト', 'フリッツ', 'フィリップ', 'フリン', 'ファビアン', 'フェニックス', 'フェルディナンド', 'フロリアン', 'フォード', 'フレデリック', 'ガレス', 'ガイ', 'ギルバート', 'グレゴリー', 'グラハム', 'グレン', 'ガブリエル', 'ジェフリー', 'ガロード', 'ギデオン', 'グンター', 'ギャビン', 'ゴードン', 'ハロルド', 'ヘンリー', 'ヒュー', 'ハンス', 'ホーク', 'ハドソン', 'ハーヴェイ', 'ホーレス', 'ハンター', 'ハーミーズ', 'ヘクター', 'ハムレット', 'ヒルデブランド', 'ホーガン', 'イアン', 'イグニス', 'アイザック', 'イヴァン', 'イリヤ', 'イシス', 'イサム', 'イーヴァル', 'イチロウ', 'イオリアス', 'イノック', 'ジャック', 'ジェイムズ', 'ジェイソン', 'ジョシュア', 'ジュリアン', 'ジャスティン', 'ジョージ', 'ジョナサン', 'ジョセフ', 'ジェレミー', 'ジェラルド', 'ジェイコブ', 'ジグムント', 'キース', 'ケント', 'カイル', 'ケビン', 'クリスチャン', 'カーティス', 'カスミ', 'クラウス', 'コール', 'コビ', 'キリアン', 'ケネス', 'カイザー', 'ルーク', 'レオ', 'リアム', 'ローガン', 'ランドル', 'ルイス', 'ローレンス', 'ラルフ', 'ランスロット', 'リチャード', 'ライアン', 'ライナス', 'レジナルド', 'マーク', 'マイル', 'モーガン', 'ミゲル', 'マイケル', 'マクシミリアン', 'モーリス', 'マルコム', 'マティアス', 'メルヴィン', 'ミッチェル', 'メイソン', 'マグナス', 'マックス', 'ネイト', 'ネイサン', 'ニコラス', 'ノックス', 'ニール', 'ナッシュ', 'ノア', 'ナルヴィ', 'ノルベルト', 'ネロ', 'ノヴァ', 'オズ', 'オーウェン', 'オリバー', 'オスカー', 'オベロン', 'オディッセウス', 'オディン', 'オーランド', 'オマール', 'オライオン', 'オスリック', 'パイク', 'ポール', 'パーシー', 'ピーター', 'パトリック', 'フェイト', 'パンドラ', 'パーシヴァル', 'ペンドラゴン', 'ピエール', 'パブロ', 'クイン', 'クエンティン', 'クライヴ', 'ロビン', 'ライリー', 'ルーファス', 'ロイド', 'ライアス', 'ラッセル', 'ロジャー', 'ロナルド', 'レイモンド', 'リック', 'ロッキー', 'ロメロ', 'ロック', 'サイラス', 'スコット', 'サム', 'セバスチャン', 'シモン', 'スタン', 'ステファン', 'スチュアート', 'サイモン', 'ソロモン', 'セージ', 'スパーダ', 'スタンリー', 'セス', 'タイガ', 'トビー', 'トマス', 'トレント', 'トロイ', 'テオ', 'テンプル', 'ティアゴ', 'ティム', 'トニー', 'トリスタン', 'ターナー', 'タイラー', 'ウル', 'アーバン', 'ウルフ', 'ユリウス', 'ヴォルフ', 'ヴィクター', 'ヴァンス', 'ヴィンセント', 'ヴァレリオ', 'ヴァルター', 'ヴァイパー', 'ウィル', 'ウォルト', 'ウェス', 'ウィリアム', 'ウォーレン', 'ウェンデル', 'ワイアット', 'ワーウィック', 'ウェズリー', 'ウィンストン', 'ザンダー', 'ザビエル', 'ヨーク', 'ヨーハン', 'ユージーン', 'ザック', 'ゼノス', 'ゼロ', 'ゼイン', 'ゼファー', 'ゼウス', 'セシル', 'デニス', 'エメリー', 'ガーウィン', 'ヒューゴ', 'イシュトヴァーン', 'ジャスパー', 'レオナード', 'マーカス', 'ナポレオン', 'オットー', 'パーシバル', 'ラファエル', 'ローランド', 'シグマ', 'ティベリウス', 'ヴァレリアン', 'ウォルター', 'クセノス', 'ユージン', 'ゼノ'];
 const namesFemale = [
   // **A - エレガント、天空、神秘 (約50種)**
   "アイリス", "アストリア", "アメリア", "アリア", "アリス", "アルテミス", "アルメリア", "アンジェリカ", "イザベラ", "イシュタル",
@@ -598,7 +584,38 @@ const namesFemale = [
   "チエリ", "ツムギ", "テミス", "テラ", "ドルチェ", "ナツメ", "ニコラ", "ニルヴァーナ", "ネイラ", "ネージュ",
   "ノア", "ハーモニー", "パステル", "ヒスイ", "ピノ", "フォグ", "フユ", "ベス",  "ミント"
 ];
-    
+
+// ランダムな冒険者のデータを生成 (名前リストは省略せず全文記載)
+function generateAdventurer(policyKey) {
+    // --- 新しい属性とスキルの生成ロジック ---
+    // 1. 属性をレア度に基づいて決定
+    const rand = Math.random();
+    let rarity;
+    if (rand < 0.02) rarity = 'Epic';       // 2%
+    else if (rand < 0.12) rarity = 'Rare';  // 10%
+    else if (rand < 0.42) rarity = 'Uncommon'; // 30%
+    else rarity = 'Common';                 // 58%
+
+    const possibleAttributes = Object.keys(ATTRIBUTES).filter(key => ATTRIBUTES[key].rarity === rarity);
+    const selectedAttributeKey = possibleAttributes[Math.floor(Math.random() * possibleAttributes.length)];
+
+    // ★★★ スカウト方針に基づいて年齢を決定 ★★★
+    const policy = SCOUT_POLICIES[policyKey];
+    const minAge = policy.minAge;
+    const maxAge = policy.maxAge;
+
+    // 選択された属性に基づいて、アバターの色相と明るさを一度だけ決定
+    const attribute = ATTRIBUTES[selectedAttributeKey];
+    const originalAttributeName = attribute?.name.replace('+', '');
+    const baseHue = ELEMENT_HUES[originalAttributeName] ?? null;
+    const brightness = ELEMENT_BRIGHTNESS[originalAttributeName] ?? 1.0;
+
+    const advHairHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
+    const advEyesHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
+
+    const age = Math.floor(Math.random() * (maxAge - minAge + 1)) + minAge;
+
+    const genders = ['男性', '女性'];
     const selectedGender = genders[Math.floor(Math.random() * genders.length)];
     let selectedName = selectedGender === '女性' 
         ? namesFemale[Math.floor(Math.random() * namesFemale.length)]
@@ -2931,10 +2948,14 @@ function inductToHallOfFame(advId) {
 
     // 既存の殿堂データを取得
     const pastRecords = JSON.parse(localStorage.getItem('guildSoulHallOfFame') || '{}');
+
+    // ★ 動的に生成された属性の場合、その属性情報も一緒に保存する
+    if (recordToInduct.attribute.includes('_plus_')) {
+        recordToInduct.dynamicAttribute = ATTRIBUTES[recordToInduct.attribute];
+    }
     
     // 新しい記録を追加または更新
     pastRecords[advId] = recordToInduct;
-
     // localStorageに保存
     localStorage.setItem('guildSoulHallOfFame', JSON.stringify(pastRecords));
 
@@ -3131,6 +3152,14 @@ function startGame(withTutorial, difficulty, inheritedAdventurer = null) {
  * 過去の記録（ギルドの殿堂）を表示します。
  */
 function showPastRecords() {
+    // ★ 殿堂入りデータから動的属性を復元する
+    const pastRecordsForAttributes = JSON.parse(localStorage.getItem('guildSoulHallOfFame') || '{}');
+    Object.values(pastRecordsForAttributes).forEach(record => {
+        if (record.dynamicAttribute && !ATTRIBUTES[record.attribute]) {
+            ATTRIBUTES[record.attribute] = record.dynamicAttribute;
+        }
+    });
+
     const pastRecords = JSON.parse(localStorage.getItem('guildSoulHallOfFame') || '{}');
 
     const homeScreen = document.getElementById('home-screen');
@@ -3483,6 +3512,9 @@ function renderStylishHomeScreen() {
     const homeScreen = document.getElementById('home-screen');
     if (!homeScreen) return;
 
+    // ★ レート対戦のチーム選択をリセット
+    selectedRatingTeam = [];
+
     // Google Fontsを動的に読み込み
     const fontLink = document.createElement('link');
     fontLink.href = 'https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Serif+JP:wght@400;700&display=swap';
@@ -3498,11 +3530,11 @@ function renderStylishHomeScreen() {
             align-items: center;
             justify-content: center;
             height: 100vh;
+            overflow-y: auto; /* ★ スクロールを許可 */
             background: linear-gradient(135deg, #2c3e50, #4a69bd);
             color: #ecf0f1;
             text-align: center;
             font-family: 'Noto Serif JP', serif;
-            overflow: hidden;
         }
         .home-title {
             font-family: 'Cinzel', serif;
@@ -3513,6 +3545,10 @@ function renderStylishHomeScreen() {
             animation: fadeInDown 1s ease-out;
         }
         .home-subtitle {
+            /* ★ レート対戦画面でスクロールバーが表示されてもガタつかないように調整 */
+            padding-left: 15px;
+            padding-right: 15px;
+
             font-size: 1.5rem;
             margin-bottom: 40px;
             color: #bdc3c7;
@@ -3522,6 +3558,11 @@ function renderStylishHomeScreen() {
         .home-menu {
             display: flex;
             flex-direction: column;
+            /* ★ レート対戦画面でスクロールバーが表示されてもガタつかないように調整 */
+            width: 100%;
+            align-items: center;
+            box-sizing: border-box;
+            padding: 0 15px;
             gap: 15px;
             animation: fadeInUp 1s ease-out 1s;
             animation-fill-mode: backwards;
@@ -3733,6 +3774,194 @@ function renderStylishHomeScreen() {
     document.head.appendChild(style);
 
     // HTMLを生成
+    // ★ レート対戦画面用のスタイルを追加
+    style.textContent += `
+        .rating-battle-screen {
+            display: flex;
+            width: 95%;
+            height: 90vh;
+            gap: 20px;
+        }
+        .rating-left-panel {
+            flex: 3;
+            overflow-y: auto;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+        .rating-right-panel {
+            flex: 2;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+        }
+        .adventurer-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 15px;
+        }
+        .adventurer-card {
+            position: relative;
+            border: 1px solid #7f8c8d;
+            border-radius: 8px;
+            padding: 5px;
+            color: #fff;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+        .adventurer-card .avatar-container {
+            width: 100%;
+            height: 75px; /* カード内のアバターサイズを調整 */
+            margin-bottom: 5px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .adventurer-card.selected::after {
+            content: '✔';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4rem;
+            color: #2ecc71;
+            text-shadow: 0 0 10px rgba(0,0,0,0.8);
+            opacity: 0.8;
+            pointer-events: none; /* チェックマークがクリックを妨げないように */
+        }
+        /* レート対戦演出用のスタイル */
+        #battle-arena {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .team-display {
+            display: flex;
+            gap: 30px;
+        }
+        .team-display .adventurer-card {
+            width: 160px; /* 幅を少し広げる */
+            height: 220px; /* 高さを広げて全体を表示 */
+            display: flex; 
+            flex-direction: column;
+            justify-content: center;
+            transition: all 0.3s ease;
+            border: 3px solid #7f8c8d;
+        }
+        .team-display .adventurer-card.fighting {
+            transform: scale(1.1);
+            border-color: #f1c40f;
+            box-shadow: 0 0 15px #f1c40f;
+        }
+        .team-display .adventurer-card.defeated {
+            filter: grayscale(100%);
+            opacity: 0.6;
+        }
+        #vs-separator {
+            font-size: 2.5rem;
+            font-family: 'Cinzel', serif;
+            color: #e74c3c;
+            text-shadow: 0 0 8px #c0392b;
+        }
+        .result-modal {
+            background: rgba(44, 62, 80, 0.9);
+            padding: 40px;
+            border-radius: 15px;
+        }
+        /* ★ 対戦開始ボタン用のスタイル */
+        .preparation-screen .start-battle-button {
+            background-color: #27ae60; /* 緑色で開始を促す */
+        }
+        .preparation-screen {
+            background: rgba(44, 62, 80, 0.9);
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            max-height: 90vh; /* 画面の高さを超えないように */
+            overflow-y: auto; /* 高さを超えた場合はスクロール */
+        }
+        .preparation-screen h2 {
+            margin-top: 0;
+            font-family: 'Cinzel', serif;
+        }
+        #battle-arena-preview {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .team-display .adventurer-card .avatar-container {
+            height: 100px; /* 対戦カード内のアバター高さを調整 */
+        }
+
+
+        .adventurer-card .avatar-container {
+            width: 75%;
+            height: 75px; /* カード内のアバターサイズを調整 */
+            margin-bottom: 5px;
+        }
+        .card-ovr { position: absolute; top: 2px; right: 5px; font-size: 1.5rem; font-weight: bold; z-index: 45; }
+        .card-attribute { 
+            position: absolute; 
+            top: 5px; 
+            left: 5px; 
+            transform: scale(1.1);
+            transform-origin: top left;
+            z-index: 50; /* アバター(z-index: 40)より手前に表示 */
+        }
+        .card-stats { text-align: center; font-size: 0.7em; }
+        .card-rank { text-align: center; font-size: 0.9em; margin-top: 2px; }
+        .rating-history {
+            width: 100%;
+            background: #2c3e50;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .rating-history h3 { margin-top: 0; }
+        #match-start-button {
+            padding: 15px 40px;
+            font-size: 1.5rem;
+        }
+        #selected-rating-adventurers-container {
+            width: 100%;
+            margin-top: 20px;
+            text-align: center;
+        }
+        #selected-rating-adventurers { min-height: 140px; /* 選択済みカードエリアの最低限の高さを確保 */ }
+    `;
+
+    // ★ レート対戦のボーナスアニメーション用スタイルを追加
+    style.textContent += `
+        .stat-bonus-animation {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-shadow: 0 0 5px black, 0 0 8px black;
+            opacity: 0;
+            animation: bonus-anim 1.4s ease-out forwards;
+            animation: bonus-anim 1.4s ease-out forwards; /* アニメーション自体は素早く */
+            pointer-events: none;
+            z-index: 100; /* 最前面に表示 */
+        }
+        @keyframes bonus-anim {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            50% { transform: translate(-50%, -80%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -120%) scale(1); opacity: 0; }
+            100% { transform: translate(-50%, -120%) scale(1); opacity: 1; } /* 100%でopacity:1を維持 */
+        }
+    `;
     homeScreen.innerHTML = `
         <h1 class="home-title">Guild Soul</h1>
         <p class="home-subtitle">- ギルド運営シミュレーション -</p>
@@ -3740,6 +3969,7 @@ function renderStylishHomeScreen() {
             <button onclick="showDifficultySelection()">はじめから</button>
             <button onclick="showSaveLoadModal('load')">ロード</button>
             <button onclick="showPastRecords()">過去の記録</button>
+            <button onclick="showRatingBattleScreen()">レート対戦</button>
         </div>
         <div id="difficulty-selection" class="home-menu" style="display: none;">
             <h3>難易度を選択してください</h3>
@@ -3769,138 +3999,624 @@ function renderStylishHomeScreen() {
     homeScreen.style.display = 'flex';
 }
 
+// --- レート対戦用の状態 ---
+let selectedRatingTeam = []; // 選択された冒険者のIDを保持する配列
+let playerRating = 1500;
+let ratingBattleHistory = [];
+const RATING_K_FACTOR = 32; // レートの変動幅を決定する定数
+const RATING_DATA_KEY = 'guildSoulRatingData'; // localStorage用のキー
+
 /**
- * 冒険者引継ぎの選択画面を表示します。
- * @param {string} difficulty - 選択された難易度
- * @param {boolean} withTutorial - チュートリアルを実行するかどうか
+ * localStorageからレート情報を読み込みます。
  */
-function showInheritanceSelection(difficulty, withTutorial) {
+function loadRatingData() {
+    const savedData = JSON.parse(localStorage.getItem(RATING_DATA_KEY));
+    if (savedData) {
+        playerRating = savedData.rating || 1500;
+        ratingBattleHistory = savedData.history || [];
+    }
+}
+
+/**
+ * レート対戦中にステータスボーナスの演出を表示します。
+ * @param {HTMLElement} cardElement - 対象となる冒d険者のカード要素
+ * @param {string} statName - '戦闘', '魔法', '探索' のいずれか
+ * @param {number} bonusAmount - 加算するボーナス量
+ */
+function showStatBonusAnimation(cardElement, statName, bonusAmount) {
+    // 1. 中央に表示するアニメーション (+10 戦闘 など)
+    const bonusText = document.createElement('div');
+    bonusText.textContent = `+${bonusAmount} ${statName}`;
+    bonusText.className = 'stat-bonus-animation';
+    const colors = { '戦闘': '#e74c3c', '魔法': '#3498db', '探索': '#2ecc71' };
+    bonusText.style.color = colors[statName] || '#ffffff';
+    cardElement.appendChild(bonusText);
+
+    setTimeout(() => {
+        bonusText.remove();
+    }, 11400); // 11.4秒 (CSSアニメーションのduration)
+
+    // 2. 右上のOVR表示を更新
+    const ovrContainer = cardElement.querySelector('.card-ovr');
+    if (ovrContainer) {
+        const bonusDisplay = ovrContainer.querySelector('.bonus-ovr-display');
+        const currentOvrValueEl = ovrContainer.querySelector('.current-ovr-value');
+
+        const currentBonus = parseInt(bonusDisplay.textContent.replace('+', '')) || 0;
+        const newBonus = currentBonus + bonusAmount;
+
+        const originalOvr = parseInt(ovrContainer.dataset.originalOvr);
+        const newOvr = originalOvr + newBonus;
+
+        bonusDisplay.textContent = `+${newBonus}`;
+        currentOvrValueEl.textContent = newOvr;
+        ovrContainer.classList.add('bonus-active');
+    }
+}
+
+/**
+ * レート対戦画面を表示します。
+ */
+function showRatingBattleScreen() {
     const homeScreen = document.getElementById('home-screen');
-    homeScreen.innerHTML = ''; // ホーム画面をクリア
+    homeScreen.innerHTML = ''; // 一旦クリア
+    homeScreen.innerHTML = `
+        <div id="rating-battle-overlay" class="modal-overlay" style="display: none; flex-direction: column; color: white; font-size: 1.5rem;">
+            <!-- 対戦演出用のオーバーレイ -->
+        </div>
+        <h1 class="home-title" style="font-size: 3rem; margin-bottom: 20px;">Rating Battle</h1>
+        <div class="rating-battle-screen">
+            <div class="rating-left-panel">
+                <h2>殿堂入り冒険者選択</h2>
+                <div id="adventurer-card-list" class="adventurer-card-grid">
+                    <!-- 冒険者カードがここに挿入されます -->
+                </div>
+            </div>
+            <div class="rating-right-panel">
+                <div class="rating-history">
+                    <h3>対戦成績</h3>
+                    <p>レート: <strong id="player-rating">${playerRating}</strong></p>
+                    <p id="rating-history-summary">過去0戦: 0勝 0敗</p>
+                </div>
+                <button id="match-start-button" class="home-menu button" onclick="findOpponentAndShowPreparation()" disabled>マッチ開始 (3人選択)</button>
+                <div id="selected-rating-adventurers-container">
+                    <h4>選択中のチーム</h4>
+                    <div id="selected-rating-adventurers" class="adventurer-card-grid">
+                        <!-- 選択された冒険者カードがここに移動します -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <button class="home-menu button" onclick="renderStylishHomeScreen()" style="margin-top: 15px; min-width: 250px;">ホームに戻る</button>
+    `;
 
+    loadRatingData(); // 画面表示時にレートを読み込む
+    renderRatingBattleAdventurerCards();
+    updateRatingBattleUI();
+}
+
+/**
+ * レート対戦画面に殿堂入り冒険者のカードを描画します。
+ */
+function renderRatingBattleAdventurerCards() {
+    // ★ レート対戦画面を開く際に、殿堂入りデータから動的属性を復元する
+    const pastRecordsForAttributes = JSON.parse(localStorage.getItem('guildSoulHallOfFame') || '{}');
+    Object.values(pastRecordsForAttributes).forEach(record => {
+        if (record.dynamicAttribute && !ATTRIBUTES[record.attribute]) {
+            ATTRIBUTES[record.attribute] = record.dynamicAttribute;
+        }
+    });
+
+    const container = document.getElementById('adventurer-card-list');
+    container.innerHTML = ''; // コンテナをクリア
     const pastRecords = JSON.parse(localStorage.getItem('guildSoulHallOfFame') || '{}');
-    const inheritableAdventurers = Object.values(pastRecords); // ★ 引継ぎ済みフィルターを解除
+    const inheritableAdventurers = Object.values(pastRecords);
 
-    // 引き継ぎ可能な冒険者がいない場合は、すぐにゲームを開始
     if (inheritableAdventurers.length === 0) {
-        startGame(withTutorial, difficulty, null);
+        container.innerHTML = '<p>レート対戦に参加できる殿堂入り冒険者がいません。</p>';
         return;
     }
 
-    const container = document.createElement('div');
-    container.id = 'inheritance-selection';
-    container.className = 'home-menu'; // 既存のスタイルを流用
-    container.style.display = 'flex';
-
-    let content = `
-        <h2>冒険者の引継ぎ</h2>
-        <p>殿堂入りした冒険者を一人だけ、新しいゲームに連れて行くことができます。<br>（スキルと属性はそのまま、ランクはGから再スタートします）</p>
-        <div class="hall-of-fame-container" style="max-height: 40vh; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
-            <table>
-                <thead>
-                    <tr><th>名前</th><th>属性</th><th>最高ランク</th><th>最高OVR</th><th>操作</th></tr>
-                </thead>
-                <tbody>
-    `;
-
     inheritableAdventurers.sort((a, b) => b.peakOvr - a.peakOvr).forEach(record => {
+        if (selectedRatingTeam.includes(record.id)) return; // 既に選択されている場合は描画しない
+        const card = document.createElement('div');
+        
+        // ★ ランクに応じて背景色を決定するロジック
+        const rankIndex = RANKS.indexOf(record.peakRank);
+        let rarityClass;
+        if (rankIndex >= RANKS.indexOf('XG')) {
+            rarityClass = 'rarity-bg-epic';
+        } else if (rankIndex >= RANKS.indexOf('A')) {
+            rarityClass = 'rarity-bg-rare';
+        } else if (rankIndex >= RANKS.indexOf('D')) {
+            rarityClass = 'rarity-bg-uncommon';
+        } else {
+            rarityClass = 'rarity-bg-common';
+        }
+
+        if (record.isInherited) {
+            rarityClass = 'rarity-bg-inherited';
+        }
+        card.className = `adventurer-card ${rarityClass}`;
+        card.id = `rating-card-${record.id}`;
+        card.onclick = () => toggleRatingAdventurerSelection(record.id);
+
         const attribute = ATTRIBUTES[record.attribute];
         const textColor = getContrastColor(attribute?.color);
         const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};">${attribute.name}</span>` : 'なし';
 
-        content += `
-            <tr>
-                <td>${record.name}</td>
-                <td>${attributeHtml}</td>
-                <td>${getStyledRankHtml(record.peakRank)}</td>
-                <td>${record.peakOvr}</td>
-                <td><button onclick='confirmInheritance(${JSON.stringify(record)}, "${difficulty}", ${withTutorial})'>この冒険者を引き継ぐ</button></td>
-            </tr>
-        `;
-    });
+        // アバターHTMLの生成
+        // ★ 名前表示用のスタイルを定義
+        let nameStyle = `border-bottom: 3px solid ${record.characterColor || '#ccc'}; padding-bottom: 2px;`;
+        if (record.isInherited) {
+            nameStyle += `color: #FFD700; text-shadow: 0 0 5px #FFD700, 0 0 8px #FFD700;`;
+        }
+        let avatarHtml = '<div class="avatar-container"></div>'; // フォールバック
+        if (record.avatar) {
+            const hairHue = record.avatar.hairHue ?? 0;
+            const eyesHue = record.avatar.eyesHue ?? 0;
+            const brightness = record.avatar.brightness ?? 1.0;
+            const faceStyle = getPartStyle('face', record.avatar.face);
+            const backStyle = getPartStyle('back', record.avatar.back);
+            const earsStyle = getPartStyle('ears', record.avatar.ears);
+            const eyesStyle = getPartStyle('eyes', record.avatar.eyes);
+            const hairStyle = getPartStyle('hair', record.avatar.hair);
+            const hairFilter = `hue-rotate(${hairHue}deg) saturate(1.5) brightness(${brightness})`;
+            hairStyle.filter = hairFilter;
+            backStyle.filter = hairFilter;
+            eyesStyle.filter = `hue-rotate(${eyesHue}deg) saturate(2) brightness(${brightness * 0.9})`;
+            const styleToString = (styleObj) => Object.entries(styleObj).map(([key, value]) => `${key.replace(/([A-Z])/g, '-$1').toLowerCase()}:${value}`).join(';');
+            avatarHtml = `
+                <div class="avatar-container">
+                    <img src="avatar_parts/back/${record.avatar.back}.svg" class="avatar-part" style="${styleToString(backStyle)}">
+                    <img src="avatar_parts/face/${record.avatar.face}.svg" class="avatar-part" style="${styleToString(faceStyle)}">
+                    <img src="avatar_parts/ears/${record.avatar.ears}.svg" class="avatar-part" style="${styleToString(earsStyle)}">
+                    <img src="avatar_parts/hair/${record.avatar.hair}.svg" class="avatar-part" style="${styleToString(hairStyle)}">
+                    <img src="avatar_parts/eyes/${record.avatar.eyes}.svg" class="avatar-part" style="${styleToString(eyesStyle)}">
+                </div>`;
+        }
 
-    content += `
-                </tbody>
-            </table>
+        card.innerHTML = `
+            <div class="card-ovr">${record.peakOvr}</div>
+            <div class="card-attribute">${attributeHtml}</div>
+            ${avatarHtml}
+            <div class="card-name" style="text-align: center;"><span class="adventurer-name" style="${nameStyle}">${record.name}</span></div>
+            <div class="card-stats">戦:${record.peakSkills.combat} / 魔:${record.peakSkills.magic} / 探:${record.peakSkills.exploration}</div>
+            <div class="card-rank">${getStyledRankHtml(record.peakRank)}</div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+/**
+ * レート対戦の冒険者選択を切り替えます。
+ * @param {number} advId - 冒険者のID
+ */
+function toggleRatingAdventurerSelection(advId) {
+    const card = document.getElementById(`rating-card-${advId}`);
+    if (!card) return;
+
+    const isSelected = selectedRatingTeam.includes(advId);
+
+    if (isSelected) {
+        // 選択解除
+        selectedRatingTeam = selectedRatingTeam.filter(id => id !== advId);
+        card.classList.remove('selected');
+        document.getElementById('adventurer-card-list').prepend(card); // 元のリストの先頭に戻す
+    } else {
+        // 選択
+        if (selectedRatingTeam.length >= 3) {
+            alert('チームは3人まで選択できます。');
+            return;
+        }
+        selectedRatingTeam.push(advId);
+        card.classList.add('selected');
+        document.getElementById('selected-rating-adventurers').appendChild(card); // 選択済みエリアに移動
+    }
+
+    updateRatingBattleUI();
+}
+
+/**
+ * レート対戦画面のUI（ボタンの状態など）を更新します。
+ */
+function updateRatingBattleUI() {
+    const matchStartButton = document.getElementById('match-start-button');
+    if (!matchStartButton) return;
+
+    const selectedCount = selectedRatingTeam.length;
+
+    if (selectedCount === 3) {
+        matchStartButton.disabled = false;
+        matchStartButton.textContent = 'マッチ開始';
+    } else {
+        matchStartButton.disabled = true;
+        matchStartButton.textContent = `マッチ開始 (${selectedCount}/${3}人)`;
+    }
+
+    // レートと戦績表示を更新
+    const ratingEl = document.getElementById('player-rating');
+    if(ratingEl) ratingEl.textContent = playerRating;
+
+    const historySummaryEl = document.getElementById('rating-history-summary');
+    if(historySummaryEl) {
+        const wins = ratingBattleHistory.filter(h => h.result === 'win').length;
+        const losses = ratingBattleHistory.length - wins;
+        historySummaryEl.textContent = `過去${ratingBattleHistory.length}戦: ${wins}勝 ${losses}敗`;
+    }
+
+
+    // 選択済みカードの並び順を更新
+    const selectedContainer = document.getElementById('selected-rating-adventurers');
+    const cards = Array.from(selectedContainer.children);
+    cards.sort((a, b) => {
+        const idA = parseInt(a.id.replace('rating-card-', ''));
+        const idB = parseInt(b.id.replace('rating-card-', ''));
+        return selectedRatingTeam.indexOf(idA) - selectedRatingTeam.indexOf(idB);
+    });
+    cards.forEach(card => selectedContainer.appendChild(card));
+
+    // 元のリストの並び順も更新（ソートし直して再描画）
+    renderRatingBattleAdventurerCards();
+}
+
+/**
+ * レート対戦のマッチングを開始し、対戦準備画面を表示します。
+ */
+async function findOpponentAndShowPreparation() {
+    if (selectedRatingTeam.length !== 3) {
+        alert('チームメンバーを3人選択してください。');
+        return;
+    }
+
+    const overlay = document.getElementById('rating-battle-overlay');
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `<p id="matching-text">対戦相手を探しています</p>`;
+
+    // マッチング中のテキストアニメーション
+    const matchingText = document.getElementById('matching-text');
+    let dotCount = 1;
+    const matchingInterval = setInterval(() => {
+        matchingText.textContent = `対戦相手を探しています${'.'.repeat(dotCount)}`;
+        dotCount = (dotCount % 3) + 1;
+    }, 500);
+
+    // 3〜5秒待機
+    const matchingTime = Math.random() * 2000 + 1000; // 1〜3秒待機に変更
+    await new Promise(resolve => setTimeout(resolve, matchingTime));
+
+    clearInterval(matchingInterval);
+
+    // チーム情報を準備
+    const pastRecords = JSON.parse(localStorage.getItem('guildSoulHallOfFame') || '{}');
+    const playerTeam = selectedRatingTeam.map(id => pastRecords[id]).filter(adv => adv !== undefined);
+
+    // 1. 対戦相手のレートを決定 (自分のレート ±50)
+    const opponentRating = Math.round(playerRating + (Math.random() * 101) - 50);
+    // 2. 相手のレートに基づいてチームを生成
+    const opponentTeam = generateOpponentTeam(opponentRating);
+
+    // 3. 対戦準備画面を表示
+    overlay.innerHTML = `
+        <div class="preparation-screen">
+            <h2>対戦準備</h2>
+            <p>対戦相手が見つかりました。編成を確認して対戦を開始してください。</p>
+            <div id="battle-arena-preview">
+                <div>
+                    <p style="text-align: center; margin-bottom: 5px;">相手チーム (レート: ${opponentRating})</p>
+                    <div id="opponent-team-display" class="team-display"></div>
+                </div>
+                <div id="vs-separator">VS</div>
+                <div>
+                    <p style="text-align: center; margin-bottom: 5px;">自チーム (レート: ${playerRating})</p>
+                    <div id="player-team-display" class="team-display"></div>
+                </div>
+            </div>
+            <button class="home-menu button start-battle-button" style="margin-top: 20px;" onclick='startRatingMatch(${JSON.stringify(playerTeam)}, ${JSON.stringify(opponentTeam)}, ${opponentRating})'>対戦開始</button>
         </div>
-        <button onclick='startGame(${withTutorial}, "${difficulty}", null)' style="margin-top: 20px; border-color: #e74c3c;">引き継がないで始める</button>
     `;
 
-    container.innerHTML = content;
-    homeScreen.appendChild(container);
+    const playerTeamDisplay = document.getElementById('player-team-display');
+    const opponentTeamDisplay = document.getElementById('opponent-team-display');
+
+    playerTeam.forEach(adv => playerTeamDisplay.appendChild(createBattleCard(adv, true)));
+    opponentTeam.forEach(adv => opponentTeamDisplay.appendChild(createBattleCard(adv, false)));
 }
 
 /**
- * 引継ぎの最終確認を行い、ゲームを開始します。
- * @param {Object} adventurerRecord - 引き継ぐ冒険者の記録
- * @param {string} difficulty - 難易度
- * @param {boolean} withTutorial - チュートリアルの有無
+ * レート対戦用の対戦相手チームを生成します。
+ * @param {number} targetRating - 目標とするチームの平均レート（OVR）
+ * @returns {Array<Object>} 3人の対戦相手冒険者の配列
  */
-function confirmInheritance(adventurerRecord, difficulty, withTutorial) {
-    if (confirm(`「${adventurerRecord.name}」をギルドの初期メンバーとして引き継ぎますか？`)) {
-        startGame(withTutorial, difficulty, adventurerRecord);
+function generateOpponentTeam(targetRating) {
+    const opponentTeam = [];
+    for (let i = 0; i < 3; i++) {
+        // 1. OVRを決定 (目標レートを中心に±100の範囲)
+        const initialOvr = Math.max(100, Math.round(targetRating / 5 + (Math.random() * 61) - 30));
+
+        // 2. 属性をランダムに決定 (generateAdventurerから流用)
+        const rand = Math.random();
+        let rarity;
+        if (rand < 0.02) rarity = 'Epic';
+        else if (rand < 0.12) rarity = 'Rare';
+        else if (rand < 0.42) rarity = 'Uncommon';
+        else rarity = 'Common';
+
+        const possibleAttributes = Object.keys(ATTRIBUTES).filter(key => ATTRIBUTES[key].rarity === rarity);
+        const selectedAttributeKey = possibleAttributes[Math.floor(Math.random() * possibleAttributes.length)];
+        const attribute = ATTRIBUTES[selectedAttributeKey];
+
+        // 3. 性別、名前、アバターを生成
+        const gender = Math.random() < 0.5 ? '男性' : '女性';
+        const name = gender === '男性'
+            ? namesMale[Math.floor(Math.random() * namesMale.length)]
+            : namesFemale[Math.floor(Math.random() * namesFemale.length)];
+
+        const originalAttributeName = attribute?.name.replace('+', '');
+        const baseHue = ELEMENT_HUES[originalAttributeName] ?? null;
+        const brightness = ELEMENT_BRIGHTNESS[originalAttributeName] ?? 1.0;
+        const hairHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
+        const eyesHue = baseHue !== null ? baseHue + (Math.random() * 20 - 10) : 0;
+
+        const avatar = {
+            face: selectAvatarPart('face', gender),
+            hair: selectAvatarPart('hair', gender),
+            back: selectAvatarPart('back', gender),
+            eyes: selectAvatarPart('eyes', gender),
+            ears: selectAvatarPart('ears', gender),
+            hairHue: hairHue,
+            eyesHue: eyesHue,
+            brightness: brightness
+        };
+
+        // 4. 各ステータスを OVR/3 ±10 で生成し、合計値を新しいOVRとする
+        const baseStat = initialOvr / 3;
+        const combat = Math.min(200, Math.max(0, Math.round(baseStat + (Math.random() * 21) - 10)));
+        const magic = Math.min(200, Math.max(0, Math.round(baseStat + (Math.random() * 21) - 10)));
+        const exploration = Math.min(200, Math.max(0, Math.round(baseStat + (Math.random() * 21) - 10)));
+
+        const finalOvr = combat + magic + exploration;
+
+        opponentTeam.push({
+            ovr_id: i, // チーム内での一意なID
+            name: name,
+            ovr: finalOvr,
+            attribute: selectedAttributeKey,
+            skills: { combat, magic, exploration },
+            avatar: avatar,
+        });
     }
+    return opponentTeam;
 }
 
 /**
- * 指定された年のストーリー任務オブジェクトを取得します。
- * イージーモードの場合、難易度を調整します。
- * @param {number} year - 対象の年
- * @returns {Object | undefined} 調整後のストーリー任務オブジェクト
+ * レート対戦の3本勝負を実行します。
  */
-function getStoryQuestForYear(year) {
-    const originalQuest = STORY_QUESTS.find(sq => sq.year === year);
-    if (!originalQuest) {
-        return undefined;
+async function startRatingMatch(playerTeam, opponentTeam, opponentRating) {
+    const overlay = document.getElementById('rating-battle-overlay');
+
+    // 対戦画面を生成
+    overlay.innerHTML = `
+        <div id="battle-arena">
+            <div id="opponent-team-display" class="team-display"></div>
+            <div id="vs-separator">VS</div>
+            <div id="player-team-display" class="team-display"></div>
+        </div>
+    `;
+
+    const playerTeamDisplay = document.getElementById('player-team-display');
+    const opponentTeamDisplay = document.getElementById('opponent-team-display');
+
+    playerTeam.forEach(adv => playerTeamDisplay.appendChild(createBattleCard(adv, true)));
+    opponentTeam.forEach(adv => opponentTeamDisplay.appendChild(createBattleCard(adv, false)));
+
+    await new Promise(resolve => setTimeout(resolve, 1000)); // 画面表示のウェイト
+
+    // 3本勝負の開始
+    let playerWins = 0;
+    let opponentWins = 0;
+
+    // 対戦開始前に全カードのOVR表示をリセット
+    const allBattleCards = document.querySelectorAll('#battle-arena .adventurer-card');
+    allBattleCards.forEach(card => {
+        const ovrContainer = card.querySelector('.card-ovr');
+        if (ovrContainer) {
+            ovrContainer.classList.remove('bonus-active');
+            const originalOvr = ovrContainer.dataset.originalOvr;
+            ovrContainer.querySelector('.bonus-ovr-display').textContent = '';
+            ovrContainer.querySelector('.current-ovr-value').textContent = originalOvr;
+        }
+    });
+
+    for (let i = 0; i < 3; i++) {
+        const playerCard = document.getElementById(`battle-card-player-${playerTeam[i].id}`);
+        const opponentCard = document.getElementById(`battle-card-opponent-${i}`);
+
+        // 1. 対戦カードをハイライト
+        playerCard.classList.add('fighting');
+        opponentCard.classList.add('fighting');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // 2. ステータス比較とボーナス加算
+        let playerBonusOvr = playerTeam[i].peakOvr;
+        let opponentBonusOvr = opponentTeam[i].ovr;
+        const playerSkills = playerTeam[i].peakSkills;
+        const opponentSkills = opponentTeam[i].skills;
+
+        const stats = ['combat', 'magic', 'exploration'];
+        const statNames = { combat: '戦闘', magic: '魔法', exploration: '探索' };
+
+        for (const stat of stats) {
+            if (playerSkills[stat] > opponentSkills[stat]) {
+                playerBonusOvr += 10;
+                showStatBonusAnimation(playerCard, statNames[stat], 10);
+            } else if (opponentSkills[stat] > playerSkills[stat]) {
+                opponentBonusOvr += 10;
+                showStatBonusAnimation(opponentCard, statNames[stat], 10);
+            }
+            await new Promise(resolve => setTimeout(resolve, 500)); // 各ステータス比較の間にウェイト
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 1500)); // ボーナス演出全体のウェイト
+
+        // 3. 最終的なOVRで勝敗を判定
+        const winProbability = 0.5 + (playerBonusOvr - opponentBonusOvr) * 0.01;
+        const playerWon = Math.random() < Math.max(0.05, Math.min(0.95, winProbability));
+
+        if (playerWon) {
+            playerWins++;
+            opponentCard.classList.add('defeated');
+            playerCard.style.borderColor = '#2ecc71'; // 勝利したカードの枠を緑に
+        } else {
+            opponentWins++;
+            playerCard.classList.add('defeated');
+            opponentCard.style.borderColor = '#2ecc71'; // 勝利したカードの枠を緑に
+        }
+
+        // 4. ハイライト解除
+        playerCard.classList.remove('fighting');
+        opponentCard.classList.remove('fighting');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // ラウンド終了後、対戦したカードのOVR表示をリセット
+        [playerCard, opponentCard].forEach(card => {
+            const ovrContainer = card.querySelector('.card-ovr');
+            if (ovrContainer) {
+                ovrContainer.classList.remove('bonus-active');
+                const originalOvr = ovrContainer.dataset.originalOvr;
+                ovrContainer.querySelector('.bonus-ovr-display').textContent = '';
+                ovrContainer.querySelector('.current-ovr-value').textContent = originalOvr;
+            }
+        });
+        await new Promise(resolve => setTimeout(resolve, 500)); // リセット後のウェイト
     }
 
-    // 難易度に応じてコピーを作成して返す
-    const questCopy = JSON.parse(JSON.stringify(originalQuest));
+    // 総合結果の判定とレート計算
+    const isOverallWin = playerWins > opponentWins;
+    const playerTeamOvr = playerTeam.reduce((sum, adv) => sum + adv.peakOvr, 0);
+    const opponentTeamOvr = opponentTeam.reduce((sum, adv) => sum + adv.ovr, 0);
+    
+    // 3. イロレーティングの計算式で勝率を予測 (OVRではなくレートを使用)
+    const winProbability = 1 / (1 + 10 ** ((opponentRating - playerRating) / 400));
+    const actualScore = isOverallWin ? 1 : 0;
+    const ratingChange = Math.round(RATING_K_FACTOR * (actualScore - winProbability));
+    const newRating = playerRating + ratingChange;
 
-    if (gameDifficulty === 'easy') {
-        const multiplier = 0.75;
-        questCopy.difficulty = Math.floor(questCopy.difficulty * multiplier);
-        questCopy.aptitudes.combat = Math.floor(questCopy.aptitudes.combat * multiplier);
-        questCopy.aptitudes.magic = Math.floor(questCopy.aptitudes.magic * multiplier);
-        questCopy.aptitudes.exploration = Math.floor(questCopy.aptitudes.exploration * multiplier);
+    // 結果を履歴に保存
+    ratingBattleHistory.push({
+        result: isOverallWin ? 'win' : 'lose',
+        opponentOvr: opponentTeamOvr,
+        ratingChange: ratingChange,
+        newRating: newRating
+    });
+    if (ratingBattleHistory.length > 10) {
+        ratingBattleHistory.shift();
     }
 
-    return questCopy;
+    // レートを更新して保存
+    playerRating = newRating;
+    localStorage.setItem(RATING_DATA_KEY, JSON.stringify({ rating: playerRating, history: ratingBattleHistory }));
+
+    // リザルト画面を表示
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    overlay.innerHTML = `
+        <div class="result-modal">
+            <h2 class="${isOverallWin ? 'win-text' : 'lose-text'}">${isOverallWin ? '🎉 VICTORY 🎉' : '😥 DEFEAT 😥'}</h2>
+            <p>${playerWins} - ${opponentWins}</p>
+            <hr>
+            <p>レート変動: <span style="font-weight: bold; color: ${ratingChange >= 0 ? '#2ecc71' : '#e74c3c'};">${ratingChange > 0 ? '+' : ''}${ratingChange}</span></p>
+            <p>新しいレート: <strong>${newRating}</strong></p>
+            <button onclick="closeRatingResult()">閉じる</button>
+        </div>
+    `;
 }
 
 /**
- * タイトル画面でチュートリアル選択を表示します。
- * @param {string} difficulty - 'easy' または 'hard'
+ * レート対戦のリザルトを閉じてUIを更新します。
  */
-function showTutorialSelection(difficulty) {
-    selectedDifficulty = difficulty; // 選択された難易度を保持
-    document.getElementById('difficulty-selection').style.display = 'none';
-    document.getElementById('tutorial-selection').style.display = 'flex';
+function closeRatingResult() {
+    const overlay = document.getElementById('rating-battle-overlay');
+    overlay.style.display = 'none';
+    updateRatingBattleUI();
 }
 
 /**
- * チュートリアル選択画面から難易度選択画面に戻ります。
+ * 対戦演出用の冒険者カードHTML要素を生成します。
+ * @param {Object} adv - 冒険者データ
+ * @param {boolean} isPlayer - プレイヤーのカードかどうか
+ * @returns {HTMLElement} カードのdiv要素
  */
-function backToDifficultySelection() {
-    document.getElementById('tutorial-selection').style.display = 'none';
-    document.getElementById('difficulty-selection').style.display = 'flex';
-}
+function createBattleCard(adv, isPlayer) {
+    const card = document.createElement('div');
+    
+    let rarityClass;
+    if (isPlayer) {
+        const rankIndex = RANKS.indexOf(adv.peakRank);
+        if (rankIndex >= RANKS.indexOf('XG')) {
+            rarityClass = 'rarity-bg-epic';
+        } else if (rankIndex >= RANKS.indexOf('A')) {
+            rarityClass = 'rarity-bg-rare';
+        } else if (rankIndex >= RANKS.indexOf('D')) {
+            rarityClass = 'rarity-bg-uncommon';
+        } else {
+            rarityClass = 'rarity-bg-common';
+        }
+    } else {
+        const attribute = ATTRIBUTES[adv.attribute];
+        rarityClass = attribute ? `rarity-bg-${attribute.rarity.toLowerCase()}` : 'rarity-bg-common';
+    }
 
+    if (adv.isInherited) {
+        rarityClass = 'rarity-bg-inherited';
+    }
+    card.className = `adventurer-card ${rarityClass}`;
+    card.id = isPlayer ? `battle-card-player-${adv.id}` : `battle-card-opponent-${adv.ovr_id}`;
 
-/**
- * タイトル画面で難易度選択を表示します。
- */
-function showDifficultySelection() {
-    document.getElementById('main-menu').style.display = 'none';
-    document.getElementById('difficulty-selection').style.display = 'flex';
-}
+    const ovr = isPlayer ? adv.peakOvr : adv.ovr;
+    const name = adv.name;
+    const skills = isPlayer ? adv.peakSkills : adv.skills;
+    const rank = isPlayer ? adv.peakRank : '??';
 
-/**
- * タイトル画面でメインメニューに戻ります。
- */
-function showMainMenu() {
-    document.getElementById('difficulty-selection').style.display = 'none';
-    document.getElementById('main-menu').style.display = 'flex';
+    const attribute = ATTRIBUTES[adv.attribute];
+    const textColor = getContrastColor(attribute?.color);
+    const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor};">${attribute.name}</span>` : 'なし';
+
+    let nameStyle = `border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;`;
+    if (adv.isInherited) {
+        nameStyle += `color: #FFD700; text-shadow: 0 0 5px #FFD700, 0 0 8px #FFD700;`;
+    }
+    let avatarHtml = '<div class="avatar-container"></div>'; // フォールバック
+    if (adv.avatar) {
+        const { hairHue = 0, eyesHue = 0, brightness = 1.0 } = adv.avatar;
+        const styleToString = (styleObj) => Object.entries(styleObj).map(([key, value]) => `${key.replace(/([A-Z])/g, '-$1').toLowerCase()}:${value}`).join(';');
+        
+        const backStyle = getPartStyle('back', adv.avatar.back);
+        const hairStyle = getPartStyle('hair', adv.avatar.hair);
+        hairStyle.filter = backStyle.filter = `hue-rotate(${hairHue}deg) saturate(1.5) brightness(${brightness})`;
+        const eyesStyle = getPartStyle('eyes', adv.avatar.eyes);
+        eyesStyle.filter = `hue-rotate(${eyesHue}deg) saturate(2) brightness(${brightness * 0.9})`;
+        avatarHtml = `
+            <div class="avatar-container">
+                <img src="avatar_parts/back/${adv.avatar.back}.svg" class="avatar-part" style="${styleToString(backStyle)}">
+                <img src="avatar_parts/face/${adv.avatar.face}.svg" class="avatar-part" style="${styleToString(getPartStyle('face', adv.avatar.face))}">
+                <img src="avatar_parts/ears/${adv.avatar.ears}.svg" class="avatar-part" style="${styleToString(getPartStyle('ears', adv.avatar.ears))}">
+                <img src="avatar_parts/hair/${adv.avatar.hair}.svg" class="avatar-part" style="${styleToString(hairStyle)}">
+                <img src="avatar_parts/eyes/${adv.avatar.eyes}.svg" class="avatar-part" style="${styleToString(eyesStyle)}">
+            </div>`;
+    }
+
+    card.innerHTML = `
+        <div class="card-ovr" data-original-ovr="${ovr}">
+            <span class="bonus-ovr-display"></span>
+            <span class="current-ovr-value">${ovr}</span>
+        </div>
+        <div class="card-attribute">${attributeHtml}</div>
+        ${avatarHtml}
+        <div class="card-name" style="text-align: center;"><span class="adventurer-name" style="${nameStyle}">${name}</span></div>
+        <div class="card-stats">戦:${skills.combat} / 魔:${skills.magic} / 探:${skills.exploration}</div>
+        <div class="card-rank">${isPlayer ? getStyledRankHtml(rank) : ''}</div>
+    `;
+    return card;
 }
 // --- 初期化 ---
 
