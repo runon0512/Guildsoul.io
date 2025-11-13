@@ -256,6 +256,38 @@ const PROMOTION_DIFFICULTIES = {
 // 昇級試験の成功率の基本値 (不足している場合に適用される最低ライン)
 const PROMOTION_BASE_SUCCESS_RATE = 50; 
 
+// OVRからランクを決定するための閾値
+const RANK_OVR_THRESHOLDS = {
+    'G': 0,
+    'F': 50,
+    'E': 75,
+    'D': 100,
+    'C': 125,
+    'B': 150,
+    'A': 200,
+    'S': 250,
+    'X': 300,
+    'XG': 330,
+    'XF': 360,
+    'XE': 390,
+    'XD': 420,
+    'XC': 450,
+    'XB': 480,
+    'XA': 510,
+    'XS': 540,
+    'XX': 570,
+    'V': 600
+};
+
+/**
+ * OVRから冒険者のランクを決定します。
+ * @param {number} ovr - 総合能力値 (OVR)
+ * @returns {string} 冒険者のランク
+ */
+function getRankFromOVR(ovr) {
+    return RANKS.slice().reverse().find(rank => ovr >= (RANK_OVR_THRESHOLDS[rank] ?? Infinity)) || 'G';
+}
+
 
 // スカウト方針の定義 (費用を万G単位に調整)
 const SCOUT_POLICIES = {
@@ -487,8 +519,8 @@ function updateAllTimeRecord(adv) {
  * @returns {number} 調整された能力値 (0-100)
  */
 function getRandomSkill(base) {
-    let skill = base + Math.floor(Math.random() * 41) - 20;
-    return Math.max(0, Math.min(200, skill));
+    const skill = base + Math.floor(Math.random() * 41) - 20;
+    return Math.max(0, skill);
 }
 
 /**
@@ -796,8 +828,8 @@ function levelUp(adv) {
         const skillIncrease = Math.round(baseIncreases[skill] / 10);
 
         // 最大値133を超えないように、実際の上昇値を計算
-        const actualIncrease = Math.min(skillIncrease, 200 - adv.skills[skill]);
-        
+        const actualIncrease = skillIncrease;
+
         adv.skills[skill] += actualIncrease;
         adv.ovr += actualIncrease; // OVRも上昇分だけ増やす
         totalIncrease += actualIncrease;
@@ -920,175 +952,133 @@ function renderProjectionSummary(containerEl) {
 // --- 冒険者リストの表示 (キャンセルボタンを追加) ---
 function renderAdventurerList() {
     const showAvatars = document.getElementById('show-avatars').checked;
-    adventurerListEl.innerHTML = ''; 
+    adventurerListEl.innerHTML = '';
+    adventurerListEl.className = 'adventurer-grid-container'; // 新しいグリッドコンテナクラスを適用
 
     if (adventurers.length === 0) {
-        adventurerListEl.innerHTML = '<div class="adventurer-list-wrapper"><p>現在、ギルドには誰もいません。</p></div>';
+        adventurerListEl.innerHTML = '<p>現在、ギルドには誰もいません。</p>';
         return;
     }
 
     // OVRの高い順にソート
     const sortedAdventurers = [...adventurers].sort((a, b) => b.ovr - a.ovr);
 
-    // --- メインコンテナとレイアウトの作成 ---
-    const wrapper = document.createElement('div');
-    wrapper.className = 'adventurer-list-wrapper';
-
-    const tableContainer = document.createElement('div');
-    tableContainer.className = 'adventurer-table-container';
-
-    // --- 冒険者テーブルの作成 ---
-    const table = document.createElement('table');
-    table.className = 'adventurer-main-table';
-    table.innerHTML = `
-        <thead>
-            <tr>
-            <th>名前</th>
-            <th>性別/年齢</th>
-            <th>属性</th>
-            <th>ランク</th>
-            <th>OVR</th>
-            <th>戦闘</th>
-            <th>魔法</th>
-            <th>探索</th>
-            <th>年俸(万G)</th>
-            <th>経験値 / NEXT</th>
-            <th>状態</th>
-            <th>操作</th>
-            </tr>
-        </thead>
-    `;
-    const tbody = table.createTBody();
-
     sortedAdventurers.forEach(adv => {
-        const row = table.insertRow();
-        
-        // ★★★ 状態の変更: クエスト予定 ★★★
+        const card = document.createElement('div');
+        card.className = 'adventurer-info-card';
+
+        // 状態に応じてクラスを追加
         const isScheduled = adv.status.startsWith('クエスト予定');
         if (isScheduled) {
-             row.classList.add('in-quest');
-        }
-        
-        const expPercentage = Math.min(100, (adv.exp / adv.expToLevelUp) * 100);
-        
-        // ★ ボタンを複数表示できるように actionButtons に変更
-        let actionButtons = '';
-        if (isScheduled) {
-            const questNameMatch = adv.status.match(/クエスト予定: (.+)/);
-            // ★ 成功率表示に対応するため、クエスト名のみを抽出する
-            const fullQuestName = questNameMatch ? questNameMatch[1] : '';
-            actionButtons = `<button onclick="cancelScheduledQuest(${adv.id}, '${fullQuestName}')">予定をキャンセル</button>`;
-        } else if (adv.status === '待機中' && !isOffseason && currentMonth !== 12) { // 待機中でオフシーズンでなく、かつ12月でない場合
-            // 昇級試験ボタン
-            if (adv.rank !== 'V') {
-                actionButtons += `<button class="action-btn-promotion" onclick="startPromotionExam(${adv.id})">昇級試験</button>`;
-            }
-            // 特別訓練ボタン
-            const attribute = ATTRIBUTES[adv.attribute];
-            if (!adv.isInherited && attribute && attribute.rarity !== 'Epic') {
-                actionButtons += `<button class="action-btn-training" onclick="startSpecialTraining(${adv.id})">特別訓練</button>`;
-            }
-            // おすすめ任務ボタン
-            actionButtons += `<button class="action-btn-recommend" onclick="assignRecommendedQuest(${adv.id})">おすすめ任務</button>`;
-
-            // 名前変更とカラー変更ボタン
-            actionButtons += `<div style="margin-top: 5px;">`;
-            if (!adv.isInherited) { // 引継ぎ冒険者は名前変更不可
-                actionButtons += `<button onclick="renameAdventurer(${adv.id})">名前変更</button>`;
-            }
-            actionButtons += `<button onclick="showColorPalette(${adv.id})">カラー変更</button>`;
-            actionButtons += `</div>`;
-
-        } else if (!isOffseason) { // その他の状態（待機中でもオフシーズンでもない）
-            // カラー変更のみ可能など、将来的な拡張のために残す
-            actionButton = `<button onclick="showColorPalette(${adv.id})">カラー変更</button>`;
+            card.classList.add('in-quest');
         }
 
-        // ★ 表示用の年俸を「月給 x 11」で再計算
-        const monthlySalary = Math.ceil(adv.annualSalary / 11);
-        const displayedAnnualSalary = monthlySalary * 11;
-
-        // 属性とスキルの表示
+        // 属性とレアリティに応じた背景クラスを追加
         const attribute = ATTRIBUTES[adv.attribute];
-        const textColor = getContrastColor(attribute?.color);
-        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor}; cursor: pointer;" onclick="showAttributeDetails('${adv.attribute}')">${attribute.name}</span>` : 'なし';
-
-        // ★ 引継ぎ冒険者か、属性レアリティに基づいて行の背景クラスを追加
         if (adv.isInherited) {
-            row.classList.add('rarity-bg-inherited');
+            card.classList.add('rarity-bg-inherited');
         } else if (attribute) {
-            const rarityClass = `rarity-bg-${attribute.rarity.toLowerCase()}`;
-            row.classList.add(rarityClass);
+            card.classList.add(`rarity-bg-${attribute.rarity.toLowerCase()}`);
+        } else {
+            card.classList.add('rarity-bg-common');
         }
 
+        // --- カードの中身を生成 ---
 
-        // ★ 引継ぎ冒険者の名前スタイルを定義
+        // 1. ヘッダー部分 (名前、ランク、OVR)
         let nameStyle = `border-bottom: 3px solid ${adv.characterColor || '#ccc'}; padding-bottom: 2px;`;
         if (adv.isInherited) {
             nameStyle += `color: #FFD700; text-shadow: 0 0 5px #FFD700, 0 0 8px #FFD700;`;
         }
+        const headerHtml = `
+            <div class="adv-card-header">
+                <span class="adventurer-name" style="${nameStyle}">${adv.name}</span>
+                <span>${getStyledRankHtml(adv.rank)} (OVR: ${adv.ovr})</span>
+            </div>
+        `;
 
-        let nameCellHtml;
+        // 2. アバター
+        let avatarHtml = '';
         if (showAvatars && adv.avatar) {
-            // ★ '+'付きの属性でも元の名前で色を取得する
-            // 冒険者オブジェクトに保存された色相と明るさを使用
             const hairHue = adv.avatar.hairHue ?? 0;
             const eyesHue = adv.avatar.eyesHue ?? 0;
             const brightness = adv.avatar.brightness ?? 1.0;
-
-            // スタイルを取得
             const faceStyle = getPartStyle('face', adv.avatar.face);
             const backStyle = getPartStyle('back', adv.avatar.back);
             const earsStyle = getPartStyle('ears', adv.avatar.ears);
             const eyesStyle = getPartStyle('eyes', adv.avatar.eyes);
             const hairStyle = getPartStyle('hair', adv.avatar.hair);
-
-            // フィルタースタイルを動的に追加
             const hairFilter = `hue-rotate(${hairHue}deg) saturate(1.5) brightness(${brightness})`;
             hairStyle.filter = hairFilter;
-            backStyle.filter = hairFilter; // 後ろ髪にも同じフィルターを適用
+            backStyle.filter = hairFilter;
             eyesStyle.filter = `hue-rotate(${eyesHue}deg) saturate(2) brightness(${brightness * 0.9})`;
-
-            // style属性を生成する関数
             const styleToString = (styleObj) => Object.entries(styleObj).map(([key, value]) => `${key.replace(/([A-Z])/g, '-$1').toLowerCase()}:${value}`).join(';');
-            const avatarHtml = `
-                <div class="avatar-container">
-                    <img src="avatar_parts/back/${adv.avatar.back}.svg" class="avatar-part" style="${styleToString(backStyle)}">
-                    <img src="avatar_parts/face/${adv.avatar.face}.svg" class="avatar-part" style="${styleToString(faceStyle)}">
-                    <img src="avatar_parts/ears/${adv.avatar.ears}.svg" class="avatar-part" style="${styleToString(earsStyle)}">
-                    <img src="avatar_parts/hair/${adv.avatar.hair}.svg" class="avatar-part" style="${styleToString(hairStyle)}">
-                    <img src="avatar_parts/eyes/${adv.avatar.eyes}.svg" class="avatar-part" style="${styleToString(eyesStyle)}">
+            avatarHtml = `
+                <div class="adv-card-avatar">
+                    <div class="avatar-container">
+                        <img src="avatar_parts/back/${adv.avatar.back}.svg" class="avatar-part" style="${styleToString(backStyle)}">
+                        <img src="avatar_parts/face/${adv.avatar.face}.svg" class="avatar-part" style="${styleToString(faceStyle)}">
+                        <img src="avatar_parts/ears/${adv.avatar.ears}.svg" class="avatar-part" style="${styleToString(earsStyle)}">
+                        <img src="avatar_parts/hair/${adv.avatar.hair}.svg" class="avatar-part" style="${styleToString(hairStyle)}">
+                        <img src="avatar_parts/eyes/${adv.avatar.eyes}.svg" class="avatar-part" style="${styleToString(eyesStyle)}">
+                    </div>
                 </div>
             `;
-            nameCellHtml = `<div class="adventurer-summary">${avatarHtml} <span class="adventurer-name" style="${nameStyle}">${adv.name}</span></div>`;
         } else {
-            nameCellHtml = `<span class="adventurer-name" style="${nameStyle}">${adv.name}</span>`;
+             avatarHtml = `<div class="adv-card-avatar"></div>`; // アバター非表示でもレイアウトが崩れないように空のdivを配置
         }
-        row.innerHTML = `
-            <td>${nameCellHtml}</td>
-            <td>${adv.gender}/${adv.age !== null ? adv.age + '歳' : '伝説'}</td>
-            <td class="adventurer-attribute-cell">${attributeHtml}</td>
-            <td>${getStyledRankHtml(adv.rank)}</td>
-            <td>${adv.ovr}</td>
-            <td>${getStyledSkillHtml(adv.skills.combat)}</td>
-            <td>${getStyledSkillHtml(adv.skills.magic)}</td>
-            <td>${getStyledSkillHtml(adv.skills.exploration)}</td>
-            <td>${displayedAnnualSalary}</td>
-            <td>
-                ${adv.isInherited ? '---' : `${adv.exp} / ${adv.expToLevelUp}`}
-                <div class="exp-bar-container">
+
+        // 3. ステータス詳細
+        const textColor = getContrastColor(attribute?.color);
+        const attributeHtml = attribute ? `<span class="talent-trait rarity-${attribute.rarity.toLowerCase()}" style="background-color: ${attribute.color}; color: ${textColor}; cursor: pointer;" onclick="showAttributeDetails('${adv.attribute}')">${attribute.name}</span>` : 'なし';
+        const monthlySalary = Math.ceil(adv.annualSalary / 11);
+        const displayedAnnualSalary = monthlySalary * 11;
+        const statsHtml = `
+            <div class="adv-card-stats">
+                <p>属性: ${attributeHtml} | ${adv.gender}/${adv.age !== null ? adv.age + '歳' : '伝説'}</p>
+                <p>戦闘: ${getStyledSkillHtml(adv.skills.combat)} | 魔法: ${getStyledSkillHtml(adv.skills.magic)} | 探索: ${getStyledSkillHtml(adv.skills.exploration)}</p>
+                <p>年俸: ${displayedAnnualSalary}万G | 状態: ${adv.status}</p>
+            </div>
+        `;
+
+        // 4. 経験値バー
+        const expPercentage = Math.min(100, (adv.exp / adv.expToLevelUp) * 100);
+        const expHtml = `
+            <div class="adv-card-exp">
+                <span>EXP: ${adv.isInherited ? '---' : `${adv.exp} / ${adv.expToLevelUp}`}</span>
+                <div class="exp-bar-container" style="width: 100%; margin: 5px 0 0 0;">
                     <div class="exp-bar" style="width: ${expPercentage}%;"></div>
                 </div>
-            </td>
-            <td>${adv.status}</td>
-            <td>${actionButtons}</td>
+            </div>
         `;
-    });
-    tableContainer.appendChild(table);
 
-    // --- 各パーツを組み立て ---
-    wrapper.appendChild(tableContainer);
-    adventurerListEl.appendChild(wrapper);
+        // 5. フッター (操作ボタン)
+        let buttonsHtml = '';
+        if (isScheduled) {
+            const questNameMatch = adv.status.match(/クエスト予定: (.+)/);
+            const fullQuestName = questNameMatch ? questNameMatch[1] : '';
+            buttonsHtml = `<button onclick="cancelScheduledQuest(${adv.id}, '${fullQuestName}')">予定をキャンセル</button>`;
+        } else if (adv.status === '待機中' && !isOffseason && currentMonth !== 12) {
+            if (adv.rank !== 'V') {
+                buttonsHtml += `<button class="action-btn-promotion" onclick="startPromotionExam(${adv.id})">昇級試験</button>`;
+            }
+            if (!adv.isInherited && attribute && attribute.rarity !== 'Epic') {
+                buttonsHtml += `<button class="action-btn-training" onclick="startSpecialTraining(${adv.id})">特別訓練</button>`;
+            }
+            buttonsHtml += `<button class="action-btn-recommend" onclick="assignRecommendedQuest(${adv.id})">おすすめ任務</button>`;
+            if (!adv.isInherited) { // 引継ぎ冒険者は名前変更不可
+                buttonsHtml += `<button onclick="renameAdventurer(${adv.id})">名前変更</button>`;
+            }
+            buttonsHtml += `<button onclick="showColorPalette(${adv.id})">カラー変更</button>`;
+        } else if (!isOffseason) {
+            buttonsHtml = `<button onclick="showColorPalette(${adv.id})">カラー変更</button>`;
+        }
+        const footerHtml = `<div class="adv-card-footer">${buttonsHtml}</div>`;
+
+        // 全てを結合
+        card.innerHTML = headerHtml + avatarHtml + statsHtml + expHtml + footerHtml;
+        adventurerListEl.appendChild(card);
+    });
 }
 
 /**
@@ -3535,12 +3525,13 @@ function renderStylishHomeScreen() {
             color: #ecf0f1;
             text-align: center;
             font-family: 'Noto Serif JP', serif;
+    padding: 15px;
+    box-sizing: border-box;
         }
         .home-title {
             font-family: 'Cinzel', serif;
-            font-size: 5rem;
+    font-size: clamp(3rem, 10vw, 5rem); /* 画面幅に応じてサイズを調整 */
             font-weight: 700;
-            text-shadow: 3px 3px 8px rgba(0,0,0,0.5);
             margin-bottom: 10px;
             animation: fadeInDown 1s ease-out;
         }
@@ -3549,7 +3540,7 @@ function renderStylishHomeScreen() {
             padding-left: 15px;
             padding-right: 15px;
 
-            font-size: 1.5rem;
+    font-size: clamp(1rem, 4vw, 1.5rem); /* 画面幅に応じてサイズを調整 */
             margin-bottom: 40px;
             color: #bdc3c7;
             animation: fadeInUp 1s ease-out 0.5s;
@@ -3576,7 +3567,8 @@ function renderStylishHomeScreen() {
             font-family: 'Noto Serif JP', serif;
             cursor: pointer;
             transition: all 0.3s ease;
-            min-width: 250px;
+    width: 100%;
+    max-width: 300px; /* 最大幅を設定 */
         }
         .home-menu button:hover {
             background-color: #ecf0f1;
@@ -3615,10 +3607,12 @@ function renderStylishHomeScreen() {
             align-items: flex-start;
         }
         .adventurer-table-container {
-            flex-grow: 1;
+    flex-grow: 1;
+    overflow-x: auto; /* テーブルがはみ出す場合に横スクロールを許可 */
         }
         .projection-summary-panel {
-            width: 280px;
+    width: 100%;
+    max-width: 280px;
             flex-shrink: 0;
             background-color: #34495e;
             padding: 15px;
@@ -3637,6 +3631,7 @@ function renderStylishHomeScreen() {
             padding: 25px;
             border-radius: 8px;
             border: 1px solid #7f8c8d;
+    color: #ecf0f1;
             width: 90%;
             max-width: 500px;
         }
@@ -3657,6 +3652,51 @@ function renderStylishHomeScreen() {
         }
         .contract-renew-button.selected { background-color: #27ae60; border-color: #2ecc71; }
         .contract-release-button.selected { background-color: #c0392b; border-color: #e74c3c; }
+
+        /* 新しい冒険者カードグリッドのスタイル */
+        .adventurer-grid-container {
+            display: grid;
+            grid-template-columns: 1fr; /* スマホでは1列 */
+            gap: 15px;
+        }
+
+        .adventurer-info-card {
+            background-color: #34495e;
+            border: 1px solid #7f8c8d;
+            border-radius: 8px;
+            padding: 15px;
+            display: grid;
+            grid-template-areas:
+                "header header"
+                "avatar stats"
+                "exp exp"
+                "footer footer";
+            grid-template-columns: auto 1fr;
+            gap: 10px 15px;
+        }
+
+        .adv-card-header { grid-area: header; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #7f8c8d; padding-bottom: 10px; }
+        .adv-card-avatar { grid-area: avatar; }
+        .adv-card-stats { grid-area: stats; display: flex; flex-direction: column; justify-content: center; gap: 5px; }
+        .adv-card-exp { grid-area: exp; }
+        .adv-card-footer { grid-area: footer; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; border-top: 1px solid #7f8c8d; padding-top: 10px; margin-top: 5px;}
+
+        .adv-card-stats p { margin: 0; font-size: 0.9em; }
+        .adv-card-footer button { font-size: 0.8em; padding: 4px 8px; margin: 0;}
+
+        /* 中サイズ画面 (例: タブレット) */
+        @media (min-width: 769px) {
+            .adventurer-grid-container {
+                grid-template-columns: repeat(2, 1fr); /* 2列 */
+            }
+        }
+
+        /* 大サイズ画面 (例: PC) */
+        @media (min-width: 1200px) {
+            .adventurer-grid-container {
+                grid-template-columns: repeat(3, 1fr); /* 3列 */
+            }
+        }
 
         /* セーブ/ロードボタンのスタイル */
         .save-load-button-active {
@@ -3780,6 +3820,7 @@ function renderStylishHomeScreen() {
             display: flex;
             width: 95%;
             height: 90vh;
+            max-width: 1400px; /* 最大幅を設定 */
             gap: 20px;
         }
         .rating-left-panel {
@@ -3801,7 +3842,7 @@ function renderStylishHomeScreen() {
         }
         .adventurer-card-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
             gap: 15px;
         }
         .adventurer-card {
@@ -3814,7 +3855,7 @@ function renderStylishHomeScreen() {
             overflow: hidden;
         }
         .adventurer-card .avatar-container {
-            width: 100%;
+            width: 90%;
             height: 75px; /* カード内のアバターサイズを調整 */
             margin-bottom: 5px;
             margin-left: auto;
@@ -3864,7 +3905,7 @@ function renderStylishHomeScreen() {
             opacity: 0.6;
         }
         #vs-separator {
-            font-size: 2.5rem;
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
             font-family: 'Cinzel', serif;
             color: #e74c3c;
             text-shadow: 0 0 8px #c0392b;
@@ -3900,6 +3941,12 @@ function renderStylishHomeScreen() {
         .team-display .adventurer-card .avatar-container {
             height: 100px; /* 対戦カード内のアバター高さを調整 */
         }
+        /* カードの名前が1行に収まるように調整 */
+        .card-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
 
         .adventurer-card .avatar-container {
@@ -3908,7 +3955,7 @@ function renderStylishHomeScreen() {
             margin-bottom: 5px;
         }
         .card-ovr { position: absolute; top: 2px; right: 5px; font-size: 1.5rem; font-weight: bold; z-index: 45; }
-        .card-attribute { 
+        .card-attribute {
             position: absolute; 
             top: 5px; 
             left: 5px; 
@@ -3916,7 +3963,7 @@ function renderStylishHomeScreen() {
             transform-origin: top left;
             z-index: 50; /* アバター(z-index: 40)より手前に表示 */
         }
-        .card-stats { text-align: center; font-size: 0.7em; }
+        .card-stats { text-align: center; font-size: 0.7em; word-break: keep-all; white-space: nowrap; }
         .card-rank { text-align: center; font-size: 0.9em; margin-top: 2px; }
         .rating-history {
             width: 100%;
@@ -3932,7 +3979,7 @@ function renderStylishHomeScreen() {
             font-size: 1.5rem;
         }
         #selected-rating-adventurers-container {
-            width: 100%;
+            width: 90%;
             margin-top: 20px;
             text-align: center;
         }
@@ -3962,6 +4009,47 @@ function renderStylishHomeScreen() {
             100% { transform: translate(-50%, -120%) scale(1); opacity: 1; } /* 100%でopacity:1を維持 */
         }
     `;
+
+    // ★★★ レスポンシブ対応のためのメディアクエリを追加 ★★★
+    style.textContent += `
+        @media (max-width: 768px) {
+            .home-title {
+                text-shadow: 2px 2px 6px rgba(0,0,0,0.5);
+            }
+            .adventurer-list-wrapper, .quest-top-row, .rating-battle-screen {
+                flex-direction: column;
+            }
+            .projection-summary-panel {
+                width: 100%;
+                max-width: 100%;
+                margin-top: 20px;
+            }
+            .quest-column {
+                width: 100%;
+            }
+            .rating-battle-screen {
+                height: auto;
+                width: 100%;
+            }
+            .rating-left-panel, .rating-right-panel {
+                width: 100%;
+                flex: none;
+            }
+            .team-display {
+                gap: 5px;
+                flex-wrap: wrap; /* 画面が狭い場合は折り返す */
+                justify-content: center;
+            }
+            .team-display .adventurer-card {
+                width: 100px;
+                height: 160px;
+            }
+            .team-display .adventurer-card .avatar-container {
+                height: 60px;
+            }
+        }
+    `;
+
     homeScreen.innerHTML = `
         <h1 class="home-title">Guild Soul</h1>
         <p class="home-subtitle">- ギルド運営シミュレーション -</p>
@@ -3997,6 +4085,63 @@ function renderStylishHomeScreen() {
         gameContainer.style.display = 'none';
     }
     homeScreen.style.display = 'flex';
+}
+
+/**
+ * ホーム画面で「はじめから」が押されたときに、難易度選択画面を表示します。
+ */
+function showDifficultySelection() {
+    document.getElementById('main-menu').style.display = 'none';
+    document.getElementById('difficulty-selection').style.display = 'flex';
+}
+
+/**
+ * 難易度選択画面などからメインメニューに戻ります。
+ */
+function showMainMenu() {
+    document.getElementById('difficulty-selection').style.display = 'none';
+    document.getElementById('main-menu').style.display = 'flex';
+}
+
+/**
+ * 難易度が選択された後、チュートリアルの有無を選択する画面を表示します。
+ * @param {string} difficulty - 'easy' または 'hard'
+ */
+function showTutorialSelection(difficulty) {
+    selectedDifficulty = difficulty;
+    document.getElementById('difficulty-selection').style.display = 'none';
+    document.getElementById('tutorial-selection').style.display = 'flex';
+}
+
+/**
+ * チュートリアル選択画面から難易度選択画面に戻ります。
+ */
+function backToDifficultySelection() {
+    document.getElementById('tutorial-selection').style.display = 'none';
+    document.getElementById('difficulty-selection').style.display = 'flex';
+}
+
+/**
+ * チュートリアルの有無が決定した後、ゲームを開始します。
+ * （現状は引継ぎ機能がないため、直接ゲーム開始関数を呼び出します）
+ * @param {string} difficulty - 'easy' または 'hard'
+ * @param {boolean} withTutorial - チュートリアルを実行するかどうか
+ */
+function showInheritanceSelection(difficulty, withTutorial) {
+    // 将来的に引継ぎ冒険者選択画面をここに実装する
+    // 現状は引継ぎなしでゲームを開始
+    startGame(withTutorial, difficulty, null);
+}
+
+/**
+ * [未実装] 引継ぎ冒険者選択画面を表示します。
+ * @param {string} difficulty 
+ * @param {boolean} withTutorial 
+ */
+function showInheritanceSelection(difficulty, withTutorial) {
+    // この関数は将来の引継ぎ機能のために予約されています。
+    // 現時点では、引継ぎなしで直接ゲームを開始します。
+    startGame(withTutorial, difficulty, null);
 }
 
 // --- レート対戦用の状態 ---
@@ -4282,7 +4427,7 @@ async function findOpponentAndShowPreparation() {
     }, 500);
 
     // 3〜5秒待機
-    const matchingTime = Math.random() * 2000 + 1000; // 1〜3秒待機に変更
+    const matchingTime = Math.random() * 200 + 100; // 1〜3秒待機に変更
     await new Promise(resolve => setTimeout(resolve, matchingTime));
 
     clearInterval(matchingInterval);
@@ -4332,7 +4477,7 @@ function generateOpponentTeam(targetRating) {
     const opponentTeam = [];
     for (let i = 0; i < 3; i++) {
         // 1. OVRを決定 (目標レートを中心に±100の範囲)
-        const initialOvr = Math.max(100, Math.round(targetRating / 5 + (Math.random() * 61) - 30));
+        const initialOvr = Math.max(100, Math.round(targetRating / 3 - 200 + (Math.random() * 61) - 30));
 
         // 2. 属性をランダムに決定 (generateAdventurerから流用)
         const rand = Math.random();
@@ -4371,13 +4516,14 @@ function generateOpponentTeam(targetRating) {
 
         // 4. 各ステータスを OVR/3 ±10 で生成し、合計値を新しいOVRとする
         const baseStat = initialOvr / 3;
-        const combat = Math.min(200, Math.max(0, Math.round(baseStat + (Math.random() * 21) - 10)));
-        const magic = Math.min(200, Math.max(0, Math.round(baseStat + (Math.random() * 21) - 10)));
-        const exploration = Math.min(200, Math.max(0, Math.round(baseStat + (Math.random() * 21) - 10)));
+        const combat = Math.max(0, Math.round(baseStat + (Math.random() * 21) - 10));
+        const magic = Math.max(0, Math.round(baseStat + (Math.random() * 21) - 10));
+        const exploration = Math.max(0, Math.round(baseStat + (Math.random() * 21) - 10));
 
         const finalOvr = combat + magic + exploration;
 
         opponentTeam.push({
+            rank: getRankFromOVR(finalOvr), // ★ OVRに基づいてランクを割り当てる
             ovr_id: i, // チーム内での一意なID
             name: name,
             ovr: finalOvr,
@@ -4562,8 +4708,17 @@ function createBattleCard(adv, isPlayer) {
             rarityClass = 'rarity-bg-common';
         }
     } else {
-        const attribute = ATTRIBUTES[adv.attribute];
-        rarityClass = attribute ? `rarity-bg-${attribute.rarity.toLowerCase()}` : 'rarity-bg-common';
+        // ★ 対戦相手のランクに基づいて背景色を決定
+        const rankIndex = RANKS.indexOf(adv.rank);
+        if (rankIndex >= RANKS.indexOf('XG')) {
+            rarityClass = 'rarity-bg-epic';
+        } else if (rankIndex >= RANKS.indexOf('A')) {
+            rarityClass = 'rarity-bg-rare';
+        } else if (rankIndex >= RANKS.indexOf('D')) {
+            rarityClass = 'rarity-bg-uncommon';
+        } else {
+            rarityClass = 'rarity-bg-common';
+        }
     }
 
     if (adv.isInherited) {
@@ -4571,11 +4726,11 @@ function createBattleCard(adv, isPlayer) {
     }
     card.className = `adventurer-card ${rarityClass}`;
     card.id = isPlayer ? `battle-card-player-${adv.id}` : `battle-card-opponent-${adv.ovr_id}`;
-
+    
     const ovr = isPlayer ? adv.peakOvr : adv.ovr;
     const name = adv.name;
     const skills = isPlayer ? adv.peakSkills : adv.skills;
-    const rank = isPlayer ? adv.peakRank : '??';
+    const rank = isPlayer ? adv.peakRank : adv.rank;
 
     const attribute = ATTRIBUTES[adv.attribute];
     const textColor = getContrastColor(attribute?.color);
@@ -4614,7 +4769,7 @@ function createBattleCard(adv, isPlayer) {
         ${avatarHtml}
         <div class="card-name" style="text-align: center;"><span class="adventurer-name" style="${nameStyle}">${name}</span></div>
         <div class="card-stats">戦:${skills.combat} / 魔:${skills.magic} / 探:${skills.exploration}</div>
-        <div class="card-rank">${isPlayer ? getStyledRankHtml(rank) : ''}</div>
+        <div class="card-rank">${getStyledRankHtml(rank)}</div>
     `;
     return card;
 }
